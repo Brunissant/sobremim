@@ -276,28 +276,30 @@ function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r)}
 async function drawBranding(ctx,w,h){
   if(!frames[state.frame][1])return;
   const logo=await loadImage("/assets/apolo-lettering.png");
-  const y=42;
+
+  const bw=430,bh=128;
+  const x=(w-bw)/2,y=28;
+
   ctx.save();
-  ctx.textAlign="center";
-  ctx.shadowColor="rgba(255,255,255,.82)";
-  ctx.shadowBlur=3;
-  ctx.shadowOffsetX=-1;
+  ctx.fillStyle="rgba(255,250,240,.58)";
+  ctx.shadowColor="rgba(44,53,40,.16)";
+  ctx.shadowBlur=9;
+  ctx.shadowOffsetY=3;
+  roundRect(ctx,x,y,bw,bh,22);ctx.fill();
+
+  ctx.shadowColor="rgba(255,255,255,.65)";
+  ctx.shadowBlur=1;
   ctx.shadowOffsetY=-1;
-  ctx.fillStyle="rgba(63,75,59,.92)";
-  ctx.font="900 23px Arial";
-  ctx.fillText("SAFARI DO",w/2-160,y+28);
-  ctx.drawImage(logo,w/2-55,y-2,150,55);
-  ctx.font="900 21px Arial";
-  ctx.fillText("14 • 11 • 2026",w/2+165,y+28);
-  ctx.shadowColor="rgba(40,48,38,.28)";
-  ctx.shadowOffsetX=1;
-  ctx.shadowOffsetY=2;
-  ctx.shadowBlur=2;
-  ctx.font="900 23px Arial";
-  ctx.fillText("SAFARI DO",w/2-160,y+28);
-  ctx.drawImage(logo,w/2-55,y-2,150,55);
-  ctx.font="900 21px Arial";
-  ctx.fillText("14 • 11 • 2026",w/2+165,y+28);
+  ctx.fillStyle="#3f4b3b";
+  ctx.textAlign="left";
+  ctx.font="900 22px Arial";
+  ctx.fillText("SAFÁRI DO",x+24,y+34);
+
+  ctx.drawImage(logo,x+86,y+35,175,58);
+
+  ctx.textAlign="right";
+  ctx.font="900 19px Arial";
+  ctx.fillText("14 • 11 • 2026",x+bw-24,y+108);
   ctx.restore();
 }
 async function composeMedia(media,_landmarks,mirror=false){
