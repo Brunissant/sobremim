@@ -310,7 +310,7 @@ function navTo(which){
 }
 $$("[data-go]").forEach(b=>b.onclick=()=>navTo(b.dataset.go));
 
-$("#startCamera").onclick=startCamera;
+$("#startCamera").onclick=startCamera; $("#nativeCameraFallback").onclick=()=>{els.cameraInput.value="";els.cameraInput.click()};
 els.switchCamera.onclick=async()=>{state.facing=state.facing==="user"?"environment":"user";await startCamera()};
 els.nativeCamera.onclick=()=>{els.cameraInput.value="";els.cameraInput.click()};
 $("#chooseGallery").onclick=()=>{els.file.value="";els.file.click()};
@@ -345,13 +345,30 @@ $("#modalShare").onclick=async()=>{const url=location.origin+"/api/photos/"+stat
 $("#modalHide").onclick=async()=>{const p=state.modalPhoto;await fetch("/api/photos/"+p.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({hidden:!p.hidden})});$("#photoModal").classList.add("hidden");loadGallery()};
 $("#modalDelete").onclick=async()=>{if(!confirm("Excluir esta foto da galeria?"))return;await fetch("/api/photos/"+state.modalPhoto.id,{method:"DELETE"});$("#photoModal").classList.add("hidden");loadGallery()};
 
+let adminSetupRequired=false;
 $("#adminEntry").onclick=async()=>{
-  const s=await(await fetch("/api/session")).json();$("#loginModal").classList.remove("hidden");$("#logoutBtn").classList.toggle("hidden",!s.admin);$("#loginBtn").classList.toggle("hidden",s.admin);$("#loginStatus").textContent=s.admin?"Você está logada como administradora.":"";
+  const s=await(await fetch("/api/session")).json();
+  adminSetupRequired=!!s.setupRequired;
+  $("#loginModal").classList.remove("hidden");
+  $("#logoutBtn").classList.toggle("hidden",!s.admin);
+  $("#loginBtn").classList.toggle("hidden",s.admin);
+  $("#adminEmail").value=s.adminEmail||"";
+  $("#adminEmail").readOnly=!!s.adminEmail;
+  $("#loginBtn").textContent=adminSetupRequired?"Criar acesso":"Entrar";
+  $("#loginHint").textContent=s.admin
+    ?"Você está logada como administradora."
+    : adminSetupRequired
+      ?"Primeiro acesso: crie agora uma senha só para administrar a galeria."
+      :"Entre com seu e-mail de administradora e a senha que você criou.";
+  $("#loginStatus").textContent="";
 };
 $("#closeLogin").onclick=()=>$("#loginModal").classList.add("hidden");
 $("#loginBtn").onclick=async()=>{
-  const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("#adminEmail").value,password:$("#adminPassword").value})});
-  const j=await r.json();if(!r.ok){$("#loginStatus").textContent=j.error;return}$("#loginStatus").textContent="Login realizado.";$("#logoutBtn").classList.remove("hidden");$("#loginBtn").classList.add("hidden");loadGallery();
+  const endpoint=adminSetupRequired?"/api/setup-admin":"/api/login";
+  const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("#adminEmail").value,password:$("#adminPassword").value})});
+  const j=await r.json();if(!r.ok){$("#loginStatus").textContent=j.error;return}
+  $("#loginStatus").textContent=adminSetupRequired?"Acesso criado e login realizado.":"Login realizado.";
+  adminSetupRequired=false;$("#logoutBtn").classList.remove("hidden");$("#loginBtn").classList.add("hidden");loadGallery();
 };
 $("#logoutBtn").onclick=async()=>{await fetch("/api/logout",{method:"POST"});$("#loginModal").classList.add("hidden");loadGallery()};
 
