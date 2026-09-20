@@ -56,11 +56,17 @@
           <video id="camera" autoplay playsinline muted></video>
           <img id="sourcePhoto" alt="" class="hidden">
           <canvas id="makeupPreview"></canvas>
-          <img id="framePreview" alt="" class="frame-overlay"><div class="frame-branding"><span>SAFARI DO <b>APOLO</b></span><small>14 • 11 • 2026</small></div>
+          <img id="framePreview" alt="" class="frame-overlay">
+          <div class="frame-branding">
+            <span class="frame-logo"><small>SAFARI DO</small><img src="/assets/apolo-lettering.png" alt="Apolo"></span>
+            <small class="frame-date">14 • 11 • 2026</small>
+          </div>
+          <button class="camera-switch-inside hidden" id="switchCameraBtn" aria-label="Trocar câmera">↻</button>
+          <button class="shutter hidden" id="shutterBtn" aria-label="Tirar foto"><span></span></button>
           <div id="cameraPlaceholder" class="camera-placeholder">Abrindo câmera…</div>
           <div id="countdown" class="countdown hidden"></div>
         </div>
-        <div class="camera-tools"><button class="secondary small hidden" id="switchCameraBtn">🔄 Trocar câmera</button><button class="secondary small hidden" id="nativeCameraBtn">📷 Usar câmera do celular</button></div>
+        <button class="secondary small hidden" id="nativeCameraBtn">📷 Usar câmera do celular</button>
 
         <div id="framePanel">
           <div id="frameGrid" class="choice-grid frames"></div>
