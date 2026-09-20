@@ -13,13 +13,13 @@ const frames = [
 ];
 
 const frameTuning = [
-  {scale:.84,y:0},
-  {scale:.79,y:-4},
-  {scale:.82,y:0},
-  {scale:.82,y:0},
-  {scale:.88,y:2},
-  {scale:.88,y:2},
-  {scale:.80,y:-2},
+  {scale:.975,y:0},  // Animais na folhagem
+  {scale:.955,y:2},  // Macaco e Apolo no jipe
+  {scale:.970,y:0},  // Girafa na folhagem
+  {scale:.970,y:0},  // Elefante botânico
+  {scale:.970,y:0},  // Leão à esquerda
+  {scale:.970,y:0},  // Leão à direita
+  {scale:.955,y:2},  // Turma com Apolo
   {scale:1,y:0}
 ];
 
@@ -295,39 +295,50 @@ function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r)}
 async function drawBranding(ctx,w,h){
   if(!frames[state.frame][1])return;
   const logo=await loadImage("/assets/apolo-lettering.png");
-  const bw=360,bh=215;
-  const x=(w-bw)/2,y=32;
+
+  const bw=330,bh=178;
+  const x=(w-bw)/2,y=28;
 
   ctx.save();
-  ctx.fillStyle="rgba(245,245,231,.54)";
-  ctx.shadowColor="rgba(55,45,35,.18)";
-  ctx.shadowBlur=12;
+
+  // fundo leve, sem aparência de cartão pesado
+  const grad=ctx.createLinearGradient(x,y,x+bw,y+bh);
+  grad.addColorStop(0,"rgba(247,247,238,.54)");
+  grad.addColorStop(1,"rgba(225,232,214,.38)");
+  ctx.fillStyle=grad;
+  ctx.shadowColor="rgba(50,42,36,.14)";
+  ctx.shadowBlur=10;
   ctx.shadowOffsetY=3;
-  roundRect(ctx,x,y,bw,bh,22);
+  roundRect(ctx,x,y,bw,bh,14);
   ctx.fill();
 
-  ctx.fillStyle="#76554d";
   ctx.textAlign="center";
-  ctx.shadowColor="rgba(255,255,255,.82)";
+
+  // SAFÁRI DO
+  ctx.fillStyle="#73554d";
+  ctx.font="800 24px Georgia";
+  ctx.shadowColor="rgba(255,255,255,.92)";
   ctx.shadowBlur=2;
   ctx.shadowOffsetX=-1;
   ctx.shadowOffsetY=-1;
-  ctx.font="800 24px Georgia";
-  ctx.fillText("SAFÁRI DO",w/2,y+42);
+  ctx.fillText("SAFÁRI DO",w/2,y+38);
 
-  ctx.shadowColor="rgba(50,60,35,.18)";
-  ctx.shadowBlur=2;
+  // Apolo
+  ctx.shadowColor="rgba(67,82,38,.20)";
+  ctx.shadowBlur=3;
   ctx.shadowOffsetX=1;
   ctx.shadowOffsetY=2;
-  ctx.drawImage(logo,w/2-105,y+47,210,78);
+  ctx.drawImage(logo,w/2-105,y+42,210,78);
 
-  ctx.shadowColor="rgba(255,255,255,.82)";
+  // data
+  ctx.fillStyle="#73554d";
+  ctx.font="800 22px Georgia";
+  ctx.shadowColor="rgba(255,255,255,.90)";
   ctx.shadowBlur=2;
   ctx.shadowOffsetX=-1;
   ctx.shadowOffsetY=-1;
-  ctx.fillStyle="#76554d";
-  ctx.font="800 22px Georgia";
-  ctx.fillText("14 • 11 • 2026",w/2,y+178);
+  ctx.fillText("14 • 11 • 2026",w/2,y+151);
+
   ctx.restore();
 }
 async function composeMedia(media,_landmarks,mirror=false){
