@@ -372,9 +372,96 @@ $("#noMakeup").onclick=()=>{state.makeup={...state.makeup,lipstick:null,lashes:"
 $("#clearAll").onclick=()=>{state.makeup={lipstick:null,lashes:"none",blush:null,intensity:.60};state.filter=0;$("#makeupIntensity").value=60;$("#makeupIntensityLabel").textContent="60%";renderMakeup();renderFilters();setFilterPreview();drawPreviewMakeup()};
 $("#makeupIntensity").oninput=e=>{state.makeup.intensity=Number(e.target.value)/100;$("#makeupIntensityLabel").textContent=e.target.value+"%";drawPreviewMakeup()};
 
+async function galleryFile(p){
+  const r=await fetch("/api/photos/"+p.id+"/image");
+  if(!r.ok)throw new Error("Não foi possível carregar a foto");
+  const blob=await r.blob();
+  const ext=blob.type.includes("png")?"png":blob.type.includes("webp")?"webp":"jpg";
+  return new File([blob],"safari-do-apolo."+ext,{type:blob.type||"image/jpeg"});
+}
+function galleryShareUrl(p){return location.origin+"/share/photo/"+p.id}
+async function saveGalleryPhoto(p){
+  const file=await galleryFile(p),url=URL.createObjectURL(file),a=document.createElement("a");
+  a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+async function nativeSharePhoto(p,hint=""){
+  try{
+    const file=await galleryFile(p);
+    if(navigator.share&&navigator.canShare?.({files:[file]})){
+      await navigator.share({files:[file],title:"Safari do Apolo",text:hint||"Uma lembrança da primeira volta ao sol do Apolo!"});
+      return true;
+    }
+  }catch(e){if(e?.name==="AbortError")return true}
+  return false;
+}
+async function shareStories(p){
+  const ok=await nativeSharePhoto(p,"Compartilhe esta lembrança no Instagram Stories 💚");
+  if(!ok){await saveGalleryPhoto(p);alert("A imagem foi salva. Abra o Instagram e escolha Stories para publicar.");}
+}
+async function shareWhatsApp(p){
+  const ok=await nativeSharePhoto(p,"Safari do Apolo 💚");
+  if(!ok){
+    const text=encodeURIComponent("Uma lembrança do Safari do Apolo 💚 "+galleryShareUrl(p));
+    window.open("https://wa.me/?text="+text,"_blank","noopener");
+  }
+}
+function shareFacebook(p){
+  const u=encodeURIComponent(galleryShareUrl(p));
+  window.open("https://www.facebook.com/sharer/sharer.php?u="+u,"_blank","noopener");
+}
+async function shareMore(p){
+  const ok=await nativeSharePhoto(p,"Uma lembrança da primeira volta ao sol do Apolo!");
+  if(!ok){
+    const u=galleryShareUrl(p);
+    try{await navigator.clipboard.writeText(u);alert("Link da foto copiado.");}
+    catch{location.href=u}
+  }
+}
+async function toggleGalleryPhoto(p){
+  await fetch("/api/photos/"+p.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({hidden:!p.hidden})});
+  await loadGallery();
+}
+async function deleteGalleryPhoto(p){
+  if(!confirm("Excluir esta foto da galeria?"))return;
+  await fetch("/api/photos/"+p.id,{method:"DELETE"});
+  await loadGallery();
+}
+function galleryAction(label,cls,fn){
+  const b=document.createElement("button");b.type="button";b.className="gallery-action "+(cls||"");b.textContent=label;
+  b.onclick=async(e)=>{e.stopPropagation();b.disabled=true;try{await fn()}finally{b.disabled=false}};
+  return b;
+}
 async function loadGallery(){
-  const r=await fetch("/api/photos"),j=await r.json();state.galleryAdmin=!!j.admin;els.galleryGrid.innerHTML="";els.galleryEmpty.classList.toggle("hidden",j.photos.length>0);
-  j.photos.forEach(p=>{const d=document.createElement("button");d.className="gallery-item"+(p.hidden?" hidden-photo":"");d.innerHTML='<img loading="lazy" src="/api/photos/'+p.id+'/image" alt="Memória do Safari do Apolo">'+(state.galleryAdmin?'<span class="gallery-admin-badge">'+(p.hidden?"Oculta":"Visível")+'</span>':"");d.onclick=()=>openPhoto(p);els.galleryGrid.appendChild(d)});
+  const r=await fetch("/api/photos"),j=await r.json();
+  state.galleryAdmin=!!j.admin;els.galleryGrid.innerHTML="";els.galleryEmpty.classList.toggle("hidden",j.photos.length>0);
+  for(const p of j.photos){
+    const card=document.createElement("article");card.className="gallery-item"+(p.hidden?" hidden-photo":"");
+    const photo=document.createElement("button");photo.type="button";photo.className="gallery-photo-button";
+    photo.innerHTML='<img loading="lazy" src="/api/photos/'+p.id+'/image" alt="Memória do Safari do Apolo">';
+    photo.onclick=()=>openPhoto(p);
+    card.appendChild(photo);
+    if(state.galleryAdmin){
+      const badge=document.createElement("span");badge.className="gallery-admin-badge";badge.textContent=p.hidden?"Oculta":"Visível";card.appendChild(badge);
+    }
+    const actions=document.createElement("div");actions.className="gallery-actions";
+    actions.append(
+      galleryAction("⬇ Salvar","",()=>saveGalleryPhoto(p)),
+      galleryAction("◎ Stories","stories",()=>shareStories(p)),
+      galleryAction("WhatsApp","whatsapp",()=>shareWhatsApp(p)),
+      galleryAction("Facebook","facebook",()=>shareFacebook(p)),
+      galleryAction("↗ Mais","",()=>shareMore(p))
+    );
+    card.appendChild(actions);
+    if(state.galleryAdmin){
+      const admin=document.createElement("div");admin.className="gallery-admin-actions";
+      admin.append(
+        galleryAction(p.hidden?"Mostrar":"Ocultar","admin-hide",()=>toggleGalleryPhoto(p)),
+        galleryAction("Excluir","admin-delete",()=>deleteGalleryPhoto(p))
+      );
+      card.appendChild(admin);
+    }
+    els.galleryGrid.appendChild(card);
+  }
   $("#adminEntry").textContent=state.galleryAdmin?"Administração ativa":"Administrar galeria";
 }
 function openPhoto(p){
@@ -382,9 +469,9 @@ function openPhoto(p){
   $("#modalHide").classList.toggle("hidden",!state.galleryAdmin);$("#modalDelete").classList.toggle("hidden",!state.galleryAdmin);$("#modalHide").textContent=p.hidden?"Tornar visível":"Ocultar";$("#photoModal").classList.remove("hidden");
 }
 $("#closePhotoModal").onclick=()=>$("#photoModal").classList.add("hidden");
-$("#modalShare").onclick=async()=>{const url=location.origin+"/api/photos/"+state.modalPhoto.id+"/image";if(navigator.share)await navigator.share({title:"Safari do Apolo",url});else navigator.clipboard?.writeText(url)};
-$("#modalHide").onclick=async()=>{const p=state.modalPhoto;await fetch("/api/photos/"+p.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({hidden:!p.hidden})});$("#photoModal").classList.add("hidden");loadGallery()};
-$("#modalDelete").onclick=async()=>{if(!confirm("Excluir esta foto da galeria?"))return;await fetch("/api/photos/"+state.modalPhoto.id,{method:"DELETE"});$("#photoModal").classList.add("hidden");loadGallery()};
+$("#modalShare").onclick=async()=>shareMore(state.modalPhoto);
+$("#modalHide").onclick=async()=>{await toggleGalleryPhoto(state.modalPhoto);$("#photoModal").classList.add("hidden")};
+$("#modalDelete").onclick=async()=>{await deleteGalleryPhoto(state.modalPhoto);$("#photoModal").classList.add("hidden")};
 
 let adminSetupRequired=false;
 async function openAdminLogin(){
