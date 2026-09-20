@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=3" />
+  <link rel="stylesheet" href="/styles.css?v=4" />
 </head>
 <body>
   <header class="topbar">
@@ -60,6 +60,7 @@
           <div id="cameraPlaceholder" class="camera-placeholder">Abrindo câmera…</div>
           <div id="countdown" class="countdown hidden"></div>
         </div>
+        <div class="camera-tools"><button class="secondary small hidden" id="switchCameraBtn">🔄 Trocar câmera</button><button class="secondary small hidden" id="nativeCameraBtn">📷 Usar câmera do celular</button></div>
 
         <div id="framePanel">
           <div id="frameGrid" class="choice-grid frames"></div>
@@ -155,7 +156,7 @@
       <button class="modal-close" id="closeLogin">×</button>
       <p class="eyebrow">ÁREA DA ADMINISTRADORA</p>
       <h2>Entrar</h2>
-      <label>E-mail<input id="adminEmail" type="email" autocomplete="username"></label>
+      <label>E-mail<input id="adminEmail" type="email" value="bruna.oliveira097@gmail.com" readonly autocomplete="username"></label><p class="admin-help">Este é o e-mail da administradora do site.</p>
       <label>Senha<input id="adminPassword" type="password" autocomplete="current-password"></label>
       <button class="primary" id="loginBtn">Entrar</button>
       <button class="text-btn hidden" id="logoutBtn">Sair da administração</button>
@@ -163,6 +164,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=3"></script>
+  <script type="module" src="/app.js?v=4"></script>
 </body>
 </html>
