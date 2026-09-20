@@ -76,15 +76,61 @@ function roundedMaskPath(ctx,x,y,w,h,r){
   ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
 }
 async function getOpenFrame(index){
-  return frames[index][1] || null;
+  const src=frames[index][1];
+  if(!src)return null;
+  if(processedFrameCache.has(index))return processedFrameCache.get(index);
+
+  const im=await loadImage(src);
+  const scan=document.createElement("canvas");
+  scan.width=im.naturalWidth||im.width;
+  scan.height=im.naturalHeight||im.height;
+  const sctx=scan.getContext("2d",{willReadFrequently:true});
+  sctx.drawImage(im,0,0,scan.width,scan.height);
+
+  let minX=scan.width,minY=scan.height,maxX=-1,maxY=-1;
+  try{
+    const data=sctx.getImageData(0,0,scan.width,scan.height).data;
+    for(let y=0;y<scan.height;y++){
+      for(let x=0;x<scan.width;x++){
+        if(data[(y*scan.width+x)*4+3]>8){
+          if(x<minX)minX=x;if(x>maxX)maxX=x;
+          if(y<minY)minY=y;if(y>maxY)maxY=y;
+        }
+      }
+    }
+  }catch(e){
+    console.warn("Não foi possível analisar transparência da moldura",e);
+  }
+
+  if(maxX<minX||maxY<minY){
+    processedFrameCache.set(index,src);
+    return src;
+  }
+
+  // Pequena margem de segurança para nunca cortar personagens/folhas.
+  const padX=Math.max(2,Math.round((maxX-minX)*.006));
+  const padY=Math.max(2,Math.round((maxY-minY)*.006));
+  minX=Math.max(0,minX-padX); minY=Math.max(0,minY-padY);
+  maxX=Math.min(scan.width-1,maxX+padX); maxY=Math.min(scan.height-1,maxY+padY);
+
+  const sw=maxX-minX+1, sh=maxY-minY+1;
+  const out=document.createElement("canvas");
+  out.width=1080;out.height=1350;
+  const octx=out.getContext("2d");
+
+  // O recorte remove somente margem transparente. O conteúdo inteiro é mantido.
+  octx.drawImage(im,minX,minY,sw,sh,0,0,out.width,out.height);
+
+  const url=out.toDataURL("image/png");
+  processedFrameCache.set(index,url);
+  return url;
 }
 async function syncFrame(){
   const src=await getOpenFrame(state.frame);
   els.frame.classList.remove("frame-open");
-  const tune=frameTuning[state.frame]||{scale:.84,y:0};
   if(src){
     els.frame.src=src;
-    els.frame.style.setProperty("--frame-transform","translateY("+tune.y+"px) scale("+tune.scale+")");
+    els.frame.style.setProperty("--frame-transform","none");
     els.frame.classList.remove("hidden");
     els.branding.classList.remove("hidden");
   }else{
@@ -348,9 +394,7 @@ async function composeMedia(media,_landmarks,mirror=false){
   const f=await getOpenFrame(state.frame);
   if(f){
     const im=await loadImage(f);
-    const tune=frameTuning[state.frame]||{scale:.84,y:0};
-    const fw=w*tune.scale,fh=h*tune.scale;
-    ctx.drawImage(im,(w-fw)/2,(h-fh)/2+tune.y*(h/430),fw,fh);
+    ctx.drawImage(im,0,0,w,h);
     await drawBranding(ctx,w,h);
   }
   return c.toDataURL("image/jpeg",.92);
