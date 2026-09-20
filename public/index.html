@@ -52,11 +52,11 @@
           <div class="progress"><i class="on"></i><i></i><i></i></div>
         </div>
 
-        <div class="photo-stage" id="photoStage">
+        <div id="selectedStrip" class="selected-strip hidden"></div><div class="photo-stage" id="photoStage">
           <video id="camera" autoplay playsinline muted></video>
           <img id="sourcePhoto" alt="" class="hidden">
           <canvas id="makeupPreview"></canvas>
-          <img id="framePreview" alt="" class="frame-overlay">
+          <img id="framePreview" alt="" class="frame-overlay"><div class="frame-branding"><span>SAFARI DO <b>APOLO</b></span><small>14 • 11 • 2026</small></div>
           <div id="cameraPlaceholder" class="camera-placeholder">Abrindo câmera…</div>
           <div id="countdown" class="countdown hidden"></div>
         </div>
@@ -124,7 +124,7 @@
         <footer>Salve sua lembrança antes de sair 💚</footer>
       </div>
 
-      <input type="file" id="fileInput" accept="image/*" hidden>
+      <input type="file" id="fileInput" accept="image/*" multiple hidden><input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
     </section>
 
     <section id="galleryView" class="view">
