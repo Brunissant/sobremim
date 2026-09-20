@@ -52,6 +52,7 @@ const els = {
 function showScreen(name){
   [els.welcome,els.edit,els.result].forEach(x=>x.classList.add("hidden"));
   els[name].classList.remove("hidden");
+  document.body.classList.toggle("studio-mode",name==="edit");
 }
 function stopCamera(){ state.stream?.getTracks().forEach(t=>t.stop()); state.stream=null; }
 function isMobile(){ return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || matchMedia("(pointer:coarse)").matches; }
@@ -69,24 +70,26 @@ async function getOpenFrame(index){
   if(processedFrameCache.has(index)) return processedFrameCache.get(index);
   const im=await loadImage(src);
   const c=document.createElement("canvas");c.width=1080;c.height=1350;const ctx=c.getContext("2d");
-  ctx.drawImage(im,0,0,c.width,c.height);
 
-  // Recortes centrais amplos: preservam personagens e detalhes externos,
-  // mas removem folhagem/ornamentos que invadem o campo da foto.
+  ctx.save();
+  ctx.globalAlpha=.90;
+  ctx.drawImage(im,0,0,c.width,c.height);
+  ctx.restore();
+
   const profiles=[
-    {x:112,y:122,w:856,h:880,r:92}, // animais
-    {x:92,y:90,w:896,h:770,r:84},   // jipe
-    {x:105,y:92,w:870,h:1010,r:88}, // girafa
-    {x:105,y:92,w:870,h:1010,r:88}, // elefante
-    {x:190,y:82,w:805,h:1040,r:90}, // leão esquerda
-    {x:85,y:82,w:805,h:1040,r:90},  // leão direita
-    {x:105,y:88,w:870,h:785,r:88}   // turma
+    {x:72,y:70,w:936,h:1040,r:72},  // animais
+    {x:68,y:62,w:944,h:875,r:72},   // jipe
+    {x:62,y:62,w:956,h:1160,r:72},  // girafa
+    {x:62,y:62,w:956,h:1160,r:72},  // elefante
+    {x:178,y:60,w:840,h:1140,r:74}, // leão esquerda
+    {x:62,y:60,w:840,h:1140,r:74},  // leão direita
+    {x:72,y:62,w:936,h:875,r:72}    // turma
   ];
   const cut=profiles[index];
   if(cut){
     ctx.save();
     ctx.globalCompositeOperation="destination-out";
-    ctx.filter="blur(4px)";
+    ctx.filter="blur(3px)";
     ctx.fillStyle="#000";
     roundedMaskPath(ctx,cut.x,cut.y,cut.w,cut.h,cut.r);
     ctx.fill();
@@ -238,29 +241,60 @@ function faceLoop(){
 
 const lipOuter=[61,146,91,181,84,17,314,405,321,375,291];
 const leftUpper=[33,160,158,133],rightUpper=[362,385,387,263];
-function pt(lm,i,w,h,mirror=false){const p=lm[i];return[(mirror?1-p.x:p.x)*w,p.y*h]}
-function drawMakeup(ctx,lm,w,h,mirror=false){
-  if(!lm)return; const a=state.makeup.intensity;
+function makeFaceMapper(lm,w,h,srcW,srcH,mirror=false){
+  const scale=Math.max(w/srcW,h/srcH);
+  const dw=srcW*scale,dh=srcH*scale;
+  const ox=(w-dw)/2,oy=(h-dh)/2;
+  return (i)=>{
+    const p=lm[i];
+    const sx=(mirror?1-p.x:p.x)*srcW;
+    const sy=p.y*srcH;
+    return [ox+sx*scale,oy+sy*scale];
+  };
+}
+function drawMakeup(ctx,lm,w,h,srcW=w,srcH=h,mirror=false){
+  if(!lm||!srcW||!srcH)return;
+  const map=makeFaceMapper(lm,w,h,srcW,srcH,mirror);
+  const a=state.makeup.intensity;
   if(state.makeup.blush){
     ctx.save();ctx.globalAlpha=.22*a;
-    for(const idx of [117,346]){const[x,y]=pt(lm,idx,w,h,mirror),r=Math.max(18,w*.065);const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,state.makeup.blush);g.addColorStop(1,"transparent");ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}ctx.restore();
+    for(const idx of [117,346]){
+      const[x,y]=map(idx),r=Math.max(18,w*.065);
+      const g=ctx.createRadialGradient(x,y,0,x,y,r);
+      g.addColorStop(0,state.makeup.blush);g.addColorStop(1,"transparent");
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+    }ctx.restore();
   }
   if(state.makeup.lipstick){
     ctx.save();ctx.globalAlpha=.46*a;ctx.fillStyle=state.makeup.lipstick;ctx.beginPath();
-    lipOuter.forEach((idx,j)=>{const[x,y]=pt(lm,idx,w,h,mirror);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.closePath();ctx.fill();ctx.restore();
+    lipOuter.forEach((idx,j)=>{const[x,y]=map(idx);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});
+    ctx.closePath();ctx.fill();ctx.restore();
   }
   if(state.makeup.lashes!=="none"){
     const amount=state.makeup.lashes==="party"?7:state.makeup.lashes==="long"?5:3;
     const len=(state.makeup.lashes==="party"?18:state.makeup.lashes==="long"?14:10)*(w/430)*a;
-    ctx.save();ctx.strokeStyle="#3f342f";ctx.lineWidth=Math.max(1.2,w/430*1.4);ctx.lineCap="round";ctx.globalAlpha=.65+.25*a;
-    for(const arr of [leftUpper,rightUpper])for(let i=0;i<amount;i++){const t=(i+1)/(amount+1),p1=pt(lm,arr[0],w,h,mirror),p2=pt(lm,arr[arr.length-1],w,h,mirror),x=p1[0]+(p2[0]-p1[0])*t,y=p1[1]+(p2[1]-p1[1])*t;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+(mirror?-1:1)*(t-.5)*len*.35,y-len);ctx.stroke()}ctx.restore();
+    ctx.save();ctx.strokeStyle="#3f342f";ctx.lineWidth=Math.max(1.2,w/430*1.4);ctx.lineCap="round";ctx.globalAlpha=.7+.2*a;
+    for(const arr of [leftUpper,rightUpper]){
+      const p1=map(arr[0]),p2=map(arr[arr.length-1]);
+      for(let i=0;i<amount;i++){
+        const t=(i+1)/(amount+1);
+        const x=p1[0]+(p2[0]-p1[0])*t,y=p1[1]+(p2[1]-p1[1])*t;
+        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+(t-.5)*len*.35,y-len);ctx.stroke();
+      }
+    }ctx.restore();
   }
 }
 function drawPreviewMakeup(){
   const c=els.makeup,box=$("#photoStage").getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);
-  c.width=Math.max(1,Math.round(box.width*dpr));c.height=Math.max(1,Math.round(box.height*dpr));c.style.width=box.width+"px";c.style.height=box.height+"px";
-  const ctx=c.getContext("2d");ctx.scale(dpr,dpr);drawMakeup(ctx,state.landmarks,box.width,box.height,false);
+  c.width=Math.max(1,Math.round(box.width*dpr));c.height=Math.max(1,Math.round(box.height*dpr));
+  c.style.width=box.width+"px";c.style.height=box.height+"px";
+  const ctx=c.getContext("2d");ctx.scale(dpr,dpr);
+  const media=state.sourceType==="camera"?els.video:els.source;
+  const sw=media?.videoWidth||media?.naturalWidth||box.width;
+  const sh=media?.videoHeight||media?.naturalHeight||box.height;
+  drawMakeup(ctx,state.landmarks,box.width,box.height,sw,sh,false);
 }
+
 
 function drawCover(ctx,media,w,h,mirror=false){
   const sw=media.videoWidth||media.naturalWidth,sh=media.videoHeight||media.naturalHeight,scale=Math.max(w/sw,h/sh),dw=sw*scale,dh=sh*scale;
@@ -271,28 +305,33 @@ function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r)}
 async function drawBranding(ctx,w,h){
   if(!frames[state.frame][1])return;
   const logo=await loadImage("/assets/apolo-lettering.png");
-  const x=40,y=38,bw=390,bh=178;
+  const y=42;
   ctx.save();
-  ctx.fillStyle="rgba(255,250,240,.68)";
-  roundRect(ctx,x,y,bw,bh,24);ctx.fill();
-  ctx.strokeStyle="rgba(129,146,106,.34)";ctx.lineWidth=1.5;ctx.stroke();
-
-  ctx.fillStyle="#3f4b3b";
-  ctx.textAlign="left";
-  ctx.font="800 24px Arial";
-  ctx.fillText("SAFARI DO",x+28,y+42);
-
-  // lettering em degrau
-  ctx.drawImage(logo,x+78,y+45,190,66);
-
-  // data no terceiro degrau
-  ctx.font="800 21px Arial";
-  ctx.fillText("14 • 11 • 2026",x+145,y+145);
+  ctx.textAlign="center";
+  ctx.shadowColor="rgba(255,255,255,.82)";
+  ctx.shadowBlur=3;
+  ctx.shadowOffsetX=-1;
+  ctx.shadowOffsetY=-1;
+  ctx.fillStyle="rgba(63,75,59,.92)";
+  ctx.font="900 23px Arial";
+  ctx.fillText("SAFARI DO",w/2-160,y+28);
+  ctx.drawImage(logo,w/2-55,y-2,150,55);
+  ctx.font="900 21px Arial";
+  ctx.fillText("14 • 11 • 2026",w/2+165,y+28);
+  ctx.shadowColor="rgba(40,48,38,.28)";
+  ctx.shadowOffsetX=1;
+  ctx.shadowOffsetY=2;
+  ctx.shadowBlur=2;
+  ctx.font="900 23px Arial";
+  ctx.fillText("SAFARI DO",w/2-160,y+28);
+  ctx.drawImage(logo,w/2-55,y-2,150,55);
+  ctx.font="900 21px Arial";
+  ctx.fillText("14 • 11 • 2026",w/2+165,y+28);
   ctx.restore();
 }
 async function composeMedia(media,landmarks,mirror=false){
   const w=1080,h=1350,c=document.createElement("canvas");c.width=w;c.height=h;const ctx=c.getContext("2d");
-  ctx.filter=filters[state.filter][1];drawCover(ctx,media,w,h,mirror);ctx.filter="none";drawMakeup(ctx,landmarks,w,h,mirror);
+  ctx.filter=filters[state.filter][1];drawCover(ctx,media,w,h,mirror);ctx.filter="none";drawMakeup(ctx,landmarks,w,h,media.videoWidth||media.naturalWidth||w,media.videoHeight||media.naturalHeight||h,mirror);
   const f=await getOpenFrame(state.frame);
   if(f){
     const im=await loadImage(f);
@@ -429,8 +468,10 @@ async function shareMore(p){
   const ok=await nativeSharePhoto(p,"Uma lembrança da primeira volta ao sol do Apolo!");
   if(!ok){
     const u=galleryShareUrl(p);
-    try{await navigator.clipboard.writeText(u);alert("Link da foto copiado.");}
-    catch{location.href=u}
+    try{
+      await navigator.clipboard.writeText(u);
+      alert("Seu navegador não abriu o menu de compartilhamento. O link da foto foi copiado.");
+    }catch{location.href=u}
   }
 }
 async function toggleGalleryPhoto(p){
@@ -459,13 +500,10 @@ async function loadGallery(){
     if(state.galleryAdmin){
       const badge=document.createElement("span");badge.className="gallery-admin-badge";badge.textContent=p.hidden?"Oculta":"Visível";card.appendChild(badge);
     }
-    const actions=document.createElement("div");actions.className="gallery-actions";
+    const actions=document.createElement("div");actions.className="gallery-actions gallery-actions-simple";
     actions.append(
       galleryAction("⬇ Salvar","",()=>saveGalleryPhoto(p)),
-      galleryAction("◎ Stories","stories",()=>shareStories(p)),
-      galleryAction("WhatsApp","whatsapp",()=>shareWhatsApp(p)),
-      galleryAction("Facebook","facebook",()=>shareFacebook(p)),
-      galleryAction("↗ Mais","",()=>shareMore(p))
+      galleryAction("↗ Compartilhar","share-main",()=>shareMore(p))
     );
     card.appendChild(actions);
     if(state.galleryAdmin){
