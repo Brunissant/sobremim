@@ -43,7 +43,7 @@ const els = {
   framePanel:$("#framePanel"), effectsPanel:$("#effectsPanel"), filterGrid:$("#filterGrid"),
   stepEyebrow:$("#stepEyebrow"), stepTitle:$("#stepTitle"), progress:$$(".progress i"),
   back:$("#backBtn"), next:$("#nextBtn"), error:$("#cameraError"), file:$("#fileInput"),
-  cameraInput:$("#cameraInput"), selectedStrip:$("#selectedStrip"),
+  cameraInput:$("#cameraInput"), selectedStrip:$("#selectedStrip"), switchCamera:$("#switchCameraBtn"), nativeCamera:$("#nativeCameraBtn"),
   resultImage:$("#resultImage"), publishStatus:$("#publishStatus"), faceStatus:$("#faceStatus"),
   galleryGrid:$("#galleryGrid"), galleryEmpty:$("#galleryEmpty"), branding:$(".frame-branding")
 };
@@ -111,7 +111,7 @@ function dataURL(file){
 }
 async function chooseFiles(files){
   const valid=[...files].filter(f=>f.type.startsWith("image/")); if(!valid.length) return;
-  stopCamera();
+  stopCamera(); els.switchCamera.classList.add("hidden"); els.nativeCamera.classList.add("hidden");
   state.sources=await Promise.all(valid.map(async f=>({name:f.name||"foto",dataUrl:await dataURL(f)})));
   state.sourceIndex=0; state.sourceType="image"; state.result=null;
   showScreen("edit"); state.step=1; updateStep(); renderSelectedStrip(); await loadCurrentSource();
@@ -137,20 +137,27 @@ function renderSelectedStrip(){
 }
 
 async function startCamera(){
-  if(isMobile()){
-    els.cameraInput.value=""; els.cameraInput.click(); return;
-  }
   showScreen("edit"); state.step=1; updateStep(); state.sourceType="camera"; state.sources=[];
   els.selectedStrip.classList.add("hidden"); els.source.classList.add("hidden"); els.video.classList.remove("hidden"); els.placeholder.classList.remove("hidden");
+  els.placeholder.textContent="Abrindo câmera…"; els.switchCamera.classList.add("hidden"); els.nativeCamera.classList.add("hidden");
   stopCamera(); els.error.classList.add("hidden");
+  if(!navigator.mediaDevices?.getUserMedia){
+    els.error.textContent="Este navegador não liberou a câmera dentro do site.";
+    els.error.classList.remove("hidden"); els.nativeCamera.classList.remove("hidden"); els.placeholder.textContent="Câmera indisponível";
+    return;
+  }
   try{
-    state.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:state.facing},width:{ideal:1280},height:{ideal:1600}},audio:false});
+    state.stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:state.facing},width:{ideal:1280},height:{ideal:1600}},audio:false
+    });
     els.video.srcObject=state.stream; await els.video.play(); els.placeholder.classList.add("hidden");
+    els.switchCamera.classList.remove("hidden"); els.nativeCamera.classList.add("hidden");
     els.video.classList.toggle("mirror",state.facing==="user"); els.makeup.classList.toggle("mirror",state.facing==="user");
     await ensureFaceLandmarker("VIDEO"); requestAnimationFrame(faceLoop);
   }catch(e){
-    els.error.textContent="A câmera ao vivo não abriu. Vamos usar a câmera do aparelho.";
-    els.error.classList.remove("hidden"); els.cameraInput.click();
+    console.warn(e);
+    els.error.textContent="Não conseguimos abrir a câmera dentro do site. Verifique a permissão da câmera no navegador ou use a câmera do celular.";
+    els.error.classList.remove("hidden"); els.nativeCamera.classList.remove("hidden"); els.placeholder.textContent="Câmera bloqueada";
   }
 }
 
@@ -293,7 +300,7 @@ async function publishAllResults(){
 function resetBooth(){
   stopCamera();state.result=null;state.landmarks=null;state.step=1;state.frame=0;state.filter=0;state.sources=[];state.sourceIndex=0;
   state.makeup={lipstick:null,lashes:"none",blush:null,intensity:.60};els.selectedStrip.classList.add("hidden");
-  els.publishStatus.textContent="";$("#publishBtn").textContent="🌿 ADICIONAR À GALERIA";
+  els.publishStatus.textContent="";$("#publishBtn").textContent="🌿 ADICIONAR À GALERIA";els.switchCamera.classList.add("hidden");els.nativeCamera.classList.add("hidden");
   renderFrames();renderFilters();renderMakeup();syncFrame();showScreen("welcome");
 }
 function navTo(which){
@@ -304,6 +311,8 @@ function navTo(which){
 $$("[data-go]").forEach(b=>b.onclick=()=>navTo(b.dataset.go));
 
 $("#startCamera").onclick=startCamera;
+els.switchCamera.onclick=async()=>{state.facing=state.facing==="user"?"environment":"user";await startCamera()};
+els.nativeCamera.onclick=()=>{els.cameraInput.value="";els.cameraInput.click()};
 $("#chooseGallery").onclick=()=>{els.file.value="";els.file.click()};
 els.file.onchange=e=>chooseFiles(e.target.files||[]);
 els.cameraInput.onchange=e=>chooseFiles(e.target.files||[]);
