@@ -12,6 +12,17 @@ const frames = [
   ["Sem moldura",null]
 ];
 
+const frameTuning = [
+  {scale:.84,y:0},
+  {scale:.79,y:-4},
+  {scale:.82,y:0},
+  {scale:.82,y:0},
+  {scale:.88,y:2},
+  {scale:.88,y:2},
+  {scale:.80,y:-2},
+  {scale:1,y:0}
+];
+
 const filters = [
   ["Natural","none"],
   ["Iluminado","brightness(1.12) contrast(.96) saturate(1.03)"],
@@ -70,8 +81,16 @@ async function getOpenFrame(index){
 async function syncFrame(){
   const src=await getOpenFrame(state.frame);
   els.frame.classList.remove("frame-open");
-  if(src){els.frame.src=src;els.frame.classList.remove("hidden");els.branding.classList.remove("hidden")}
-  else {els.frame.classList.add("hidden");els.branding.classList.add("hidden")}
+  const tune=frameTuning[state.frame]||{scale:.84,y:0};
+  if(src){
+    els.frame.src=src;
+    els.frame.style.transform="translateY("+tune.y+"px) scale("+tune.scale+")";
+    els.frame.classList.remove("hidden");
+    els.branding.classList.remove("hidden");
+  }else{
+    els.frame.classList.add("hidden");
+    els.branding.classList.add("hidden");
+  }
 }
 function renderFrames(){
   els.frameGrid.innerHTML="";
@@ -276,30 +295,39 @@ function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r)}
 async function drawBranding(ctx,w,h){
   if(!frames[state.frame][1])return;
   const logo=await loadImage("/assets/apolo-lettering.png");
-
-  const bw=430,bh=128;
-  const x=(w-bw)/2,y=28;
+  const bw=360,bh=215;
+  const x=(w-bw)/2,y=32;
 
   ctx.save();
-  ctx.fillStyle="rgba(255,250,240,.58)";
-  ctx.shadowColor="rgba(44,53,40,.16)";
-  ctx.shadowBlur=9;
+  ctx.fillStyle="rgba(245,245,231,.54)";
+  ctx.shadowColor="rgba(55,45,35,.18)";
+  ctx.shadowBlur=12;
   ctx.shadowOffsetY=3;
-  roundRect(ctx,x,y,bw,bh,22);ctx.fill();
+  roundRect(ctx,x,y,bw,bh,22);
+  ctx.fill();
 
-  ctx.shadowColor="rgba(255,255,255,.65)";
-  ctx.shadowBlur=1;
+  ctx.fillStyle="#76554d";
+  ctx.textAlign="center";
+  ctx.shadowColor="rgba(255,255,255,.82)";
+  ctx.shadowBlur=2;
+  ctx.shadowOffsetX=-1;
   ctx.shadowOffsetY=-1;
-  ctx.fillStyle="#3f4b3b";
-  ctx.textAlign="left";
-  ctx.font="900 22px Arial";
-  ctx.fillText("SAFÁRI DO",x+24,y+34);
+  ctx.font="800 24px Georgia";
+  ctx.fillText("SAFÁRI DO",w/2,y+42);
 
-  ctx.drawImage(logo,x+86,y+35,175,58);
+  ctx.shadowColor="rgba(50,60,35,.18)";
+  ctx.shadowBlur=2;
+  ctx.shadowOffsetX=1;
+  ctx.shadowOffsetY=2;
+  ctx.drawImage(logo,w/2-105,y+47,210,78);
 
-  ctx.textAlign="right";
-  ctx.font="900 19px Arial";
-  ctx.fillText("14 • 11 • 2026",x+bw-24,y+108);
+  ctx.shadowColor="rgba(255,255,255,.82)";
+  ctx.shadowBlur=2;
+  ctx.shadowOffsetX=-1;
+  ctx.shadowOffsetY=-1;
+  ctx.fillStyle="#76554d";
+  ctx.font="800 22px Georgia";
+  ctx.fillText("14 • 11 • 2026",w/2,y+178);
   ctx.restore();
 }
 async function composeMedia(media,_landmarks,mirror=false){
@@ -309,9 +337,9 @@ async function composeMedia(media,_landmarks,mirror=false){
   const f=await getOpenFrame(state.frame);
   if(f){
     const im=await loadImage(f);
-    const scale=.95;
-    const fw=w*scale,fh=h*scale;
-    ctx.drawImage(im,(w-fw)/2,(h-fh)/2,fw,fh);
+    const tune=frameTuning[state.frame]||{scale:.84,y:0};
+    const fw=w*tune.scale,fh=h*tune.scale;
+    ctx.drawImage(im,(w-fw)/2,(h-fh)/2+tune.y*(h/430),fw,fh);
     await drawBranding(ctx,w,h);
   }
   return c.toDataURL("image/jpeg",.92);
