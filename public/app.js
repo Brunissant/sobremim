@@ -12,6 +12,13 @@ const frames = [
   ["Sem moldura",null]
 ];
 
+const frameImages = new Map();
+
+function getFrameImage(src){
+  if(!frameImages.has(src)) frameImages.set(src,loadImage(src));
+  return frameImages.get(src);
+}
+
 const state = {
   frame:0,
   stream:null,
@@ -85,13 +92,17 @@ $("#brandHome").onclick=async()=>{
   if(!state.stream && state.sourceType!=="image") await startCamera();
 };
 
-function syncFrame(){
+async function syncFrame(){
   const src=frames[state.frame][1];
   if(src){
-    els.frame.src=src;
     els.frame.classList.remove("hidden");
     els.branding.classList.remove("hidden");
+    const image=await getFrameImage(src);
+    const ctx=els.frame.getContext("2d");
+    ctx.clearRect(0,0,els.frame.width,els.frame.height);
+    drawBalancedFrame(ctx,image,els.frame.width,els.frame.height,state.frame);
   }else{
+    els.frame.getContext("2d").clearRect(0,0,els.frame.width,els.frame.height);
     els.frame.classList.add("hidden");
     els.branding.classList.add("hidden");
   }
@@ -106,9 +117,9 @@ function renderFrames(){
     b.innerHTML=src
       ? '<span class="frame-thumb"><img src="'+src+'" alt=""></span><span>'+name+'</span>'
       : '<span class="frame-thumb none">＋</span><span>Sem moldura</span>';
-    b.onclick=()=>{
+    b.onclick=async()=>{
       state.frame=i;
-      syncFrame();
+      await syncFrame();
       renderFrames();
     };
     els.frameGrid.appendChild(b);
@@ -252,16 +263,50 @@ async function loadImage(src){
   return im;
 }
 
+function drawFrameCorners(ctx,image,w,h){
+  const sw=image.naturalWidth,sh=image.naturalHeight;
+  const halfW=sw/2,halfH=sh/2;
+  const cornerW=w*.35,cornerH=h*.35;
+  ctx.drawImage(image,0,0,halfW,halfH,0,0,cornerW,cornerH);
+  ctx.drawImage(image,halfW,0,halfW,halfH,w-cornerW,0,cornerW,cornerH);
+  ctx.drawImage(image,0,halfH,halfW,halfH,0,h-cornerH,cornerW,cornerH);
+  ctx.drawImage(image,halfW,halfH,halfW,halfH,w-cornerW,h-cornerH,cornerW,cornerH);
+}
+
+function drawBottomGroup(ctx,image,w,h,index){
+  const sw=image.naturalWidth,sh=image.naturalHeight;
+  const topW=w*.35,topH=h*.30;
+
+  // Folhagens superiores menores, sempre encostadas nos cantos.
+  ctx.drawImage(image,0,0,sw/2,sh*.42,0,0,topW,topH);
+  ctx.drawImage(image,sw/2,0,sw/2,sh*.42,w-topW,0,topW,topH);
+
+  // Personagens permanecem inteiros e centralizados na base.
+  const sourceY=sh*.36;
+  const groupWidth=index===6?w*.66:w*.72;
+  const groupHeight=(sh-sourceY)*(groupWidth/sw);
+  ctx.drawImage(image,0,sourceY,sw,sh-sourceY,(w-groupWidth)/2,h-groupHeight,groupWidth,groupHeight);
+}
+
+function drawBalancedFrame(ctx,image,w,h,index){
+  ctx.save();
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality="high";
+  if(index===1||index===6) drawBottomGroup(ctx,image,w,h,index);
+  else drawFrameCorners(ctx,image,w,h);
+  ctx.restore();
+}
+
 async function drawBranding(ctx,w){
   if(!frames[state.frame][1])return;
   const logo=await loadImage("/assets/apolo-lettering.png");
-  const y=34;
+  const y=24;
 
   ctx.save();
   ctx.textAlign="center";
 
   // SAFÁRI DO — relevo claro + sombra marrom
-  ctx.font="800 26px Georgia";
+  ctx.font="800 25px Georgia";
   ctx.fillStyle="#79574c";
   ctx.shadowColor="rgba(255,255,255,.98)";
   ctx.shadowBlur=2;
@@ -279,26 +324,26 @@ async function drawBranding(ctx,w){
   ctx.shadowBlur=1;
   ctx.shadowOffsetX=-1;
   ctx.shadowOffsetY=-1;
-  ctx.drawImage(logo,w/2-120,y+35,240,90);
+  ctx.drawImage(logo,w/2-112,y+34,224,82);
   ctx.shadowColor="rgba(66,80,40,.25)";
   ctx.shadowBlur=3;
   ctx.shadowOffsetX=2;
   ctx.shadowOffsetY=3;
-  ctx.drawImage(logo,w/2-120,y+35,240,90);
+  ctx.drawImage(logo,w/2-112,y+34,224,82);
 
   // Data — mesmo relevo do título
-  ctx.font="800 23px Georgia";
+  ctx.font="800 22px Georgia";
   ctx.fillStyle="#79574c";
   ctx.shadowColor="rgba(255,255,255,.98)";
   ctx.shadowBlur=2;
   ctx.shadowOffsetX=-2;
   ctx.shadowOffsetY=-2;
-  ctx.fillText("14 • 11 • 2026",w/2,y+151);
+  ctx.fillText("14 • 11 • 2026",w/2,y+138);
   ctx.shadowColor="rgba(112,78,66,.55)";
   ctx.shadowBlur=2;
   ctx.shadowOffsetX=2;
   ctx.shadowOffsetY=3;
-  ctx.fillText("14 • 11 • 2026",w/2,y+151);
+  ctx.fillText("14 • 11 • 2026",w/2,y+138);
 
   ctx.restore();
 }
@@ -310,8 +355,8 @@ async function composeMedia(media,mirror=false){
   drawCover(ctx,media,w,h,mirror);
   const frameSrc=frames[state.frame][1];
   if(frameSrc){
-    const frame=await loadImage(frameSrc);
-    ctx.drawImage(frame,0,0,w,h);
+    const frame=await getFrameImage(frameSrc);
+    drawBalancedFrame(ctx,frame,w,h,state.frame);
     await drawBranding(ctx,w);
   }
   return canvas.toDataURL("image/jpeg",.92);
