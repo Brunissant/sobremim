@@ -827,3 +827,96 @@ body.studio-mode .compact-back{
   .tag-apolo{left:37px!important;top:19px!important;width:76px!important;height:27px!important}
   .tag-date{font-size:.40rem!important}
 }
+
+/* v13 — proporção harmônica das molduras + tag conforme referência */
+.frame-overlay{
+  transform:var(--frame-transform,scale(.84))!important;
+  transform-origin:center center!important;
+  object-fit:contain!important;
+  opacity:1!important;
+}
+
+/* tag centralizada, com composição igual à referência */
+.frame-branding{
+  position:absolute!important;
+  z-index:6!important;
+  left:50%!important;
+  top:10px!important;
+  bottom:auto!important;
+  transform:translateX(-50%)!important;
+  width:176px!important;
+  height:112px!important;
+  max-width:none!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:12px!important;
+  background:rgba(246,246,233,.54)!important;
+  backdrop-filter:blur(5px)!important;
+  box-shadow:
+    0 4px 12px rgba(49,43,35,.12),
+    inset 0 1px 0 rgba(255,255,255,.62)!important;
+  overflow:hidden!important;
+}
+.tag-safari{
+  position:absolute!important;
+  left:50%!important;
+  top:9px!important;
+  transform:translateX(-50%)!important;
+  width:100%!important;
+  text-align:center!important;
+  font-family:Georgia,"Times New Roman",serif!important;
+  font-size:.58rem!important;
+  font-weight:800!important;
+  letter-spacing:.18em!important;
+  color:#76554d!important;
+  text-shadow:
+    -1px -1px 0 rgba(255,255,255,.86),
+     1px 1px 1px rgba(90,68,58,.20)!important;
+}
+.tag-apolo{
+  position:absolute!important;
+  left:50%!important;
+  top:27px!important;
+  transform:translateX(-50%)!important;
+  width:132px!important;
+  height:48px!important;
+  object-fit:contain!important;
+  filter:drop-shadow(1px 2px 1px rgba(68,82,45,.16));
+}
+.tag-date{
+  position:absolute!important;
+  left:50%!important;
+  right:auto!important;
+  bottom:10px!important;
+  transform:translateX(-50%)!important;
+  width:100%!important;
+  text-align:center!important;
+  font-family:Georgia,"Times New Roman",serif!important;
+  font-size:.53rem!important;
+  font-weight:800!important;
+  letter-spacing:.13em!important;
+  color:#76554d!important;
+  text-shadow:
+    -1px -1px 0 rgba(255,255,255,.86),
+     1px 1px 1px rgba(90,68,58,.20)!important;
+}
+
+/* miniaturas sem cortar nada */
+body.studio-mode .choice-grid.frames .choice-thumb img{
+  transform:scale(.82)!important;
+  object-fit:contain!important;
+}
+
+/* texto correto após remover filtros */
+body.studio-mode .studio-head span{
+  color:var(--muted)!important;
+}
+@media(max-width:380px){
+  .frame-branding{
+    width:162px!important;
+    height:103px!important;
+  }
+  .tag-safari{font-size:.53rem!important}
+  .tag-apolo{width:122px!important;height:44px!important;top:26px!important}
+  .tag-date{font-size:.48rem!important}
+}
