@@ -57,7 +57,9 @@
           <canvas id="makeupPreview"></canvas>
           <img id="framePreview" alt="" class="frame-overlay">
           <div class="frame-branding" aria-hidden="true">
-            <span class="brand-inline"><small>SAFARI DO</small><img src="/assets/apolo-lettering.png" alt=""><small>14 • 11 • 2026</small></span>
+            <small class="tag-safari">SAFÁRI DO</small>
+            <img src="/assets/apolo-lettering.png" alt="" class="tag-apolo">
+            <small class="tag-date">14 • 11 • 2026</small>
           </div>
           <button class="camera-switch-inside hidden" id="switchCameraBtn" aria-label="Trocar câmera">↻</button>
           <button class="shutter hidden" id="shutterBtn" aria-label="Tirar foto"><span></span></button>
@@ -66,17 +68,13 @@
         </div>
         <button class="secondary small hidden" id="nativeCameraBtn">📷 Usar câmera do celular</button>
 
-        <div class="studio-tabs">
-          <button class="studio-tab active" data-studio-tab="frames">🌿 Molduras</button>
-          <button class="studio-tab" data-studio-tab="filters">✨ Filtros</button>
-          <button class="studio-tab" data-studio-tab="makeup">💄 Maquiagem</button>
-        </div>
+        <div class="frame-selector-title">Escolha sua moldura</div>
 
         <div id="framePanel" class="studio-panel">
           <div id="frameGrid" class="choice-grid frames"></div>
         </div>
 
-        <div id="effectsPanel">
+        <div id="effectsPanel" class="hidden">
           <div id="makeupPanel" class="effect-panel hidden">
             <div class="effect-group">
               <div class="effect-label"><strong>Batom</strong><button class="mini-link" data-clear="lipstick">Limpar</button></div>
