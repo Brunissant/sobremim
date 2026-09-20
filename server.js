@@ -14,7 +14,7 @@ const pool = new Pool({
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "").toLowerCase();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
-const SESSION_SECRET = process.env.SESSION_SECRET || "change-me";
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.createHash("sha256").update(ADMIN_PASSWORD || "admin-disabled").digest("hex");
 
 await pool.query(`
   create table if not exists gallery_photos (
@@ -128,7 +128,7 @@ app.get("/assets/:name",async(req,res)=>{
 });
 
 app.get("/health",(req,res)=>res.json({ok:true}));
-app.get("*",(req,res)=>res.sendFile(process.cwd()+"/public/index.html"));
+app.get("/*splat",(req,res)=>res.sendFile(process.cwd()+"/public/index.html"));
 
 const port=Number(process.env.PORT||3000);
 app.listen(port,()=>console.log("Safari do Apolo online na porta",port));
