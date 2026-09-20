@@ -214,14 +214,21 @@ async function ensureFaceLandmarker(mode){
     if(!mpModule) mpModule=await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm");
     if(!state.landmarker){
       const vision=await mpModule.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm");
-      state.landmarker=await mpModule.FaceLandmarker.createFromOptions(vision,{
-        baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",delegate:"GPU"},
-        runningMode:mode,numFaces:1,outputFaceBlendshapes:false
-      });
+      const base={modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"};
+      try{
+        state.landmarker=await mpModule.FaceLandmarker.createFromOptions(vision,{
+          baseOptions:{...base,delegate:"GPU"},runningMode:mode,numFaces:1,outputFaceBlendshapes:false
+        });
+      }catch(gpuError){
+        console.warn("FaceLandmarker GPU indisponível; usando CPU",gpuError);
+        state.landmarker=await mpModule.FaceLandmarker.createFromOptions(vision,{
+          baseOptions:{...base,delegate:"CPU"},runningMode:mode,numFaces:1,outputFaceBlendshapes:false
+        });
+      }
     }else await state.landmarker.setOptions({runningMode:mode});
     state.faceReady=true; els.faceStatus.textContent="Maquiagem facial pronta — os efeitos acompanham o rosto.";
   }catch(e){
-    console.warn(e); state.faceReady=false; els.faceStatus.textContent="Neste aparelho, use Luz & Cor normalmente; a maquiagem facial pode ficar indisponível.";
+    console.warn(e); state.faceReady=false; els.faceStatus.textContent="Não foi possível ativar maquiagem facial neste aparelho. Filtros de luz continuam disponíveis.";
   }
 }
 async function detectImageFaceFor(image){
