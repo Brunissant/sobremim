@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#f7f0df" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Safari do Apolo — Memórias da Festa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <button class="brand" data-go="booth" aria-label="Ir para cabine">
+      <img src="/assets/apolo-rosto-centralizado.png" alt="Apolo" class="apolo-face">
+      <span class="brand-text">
+        <small>SAFARI DO</small>
+        <img src="/assets/apolo-lettering.png" alt="Apolo" class="lettering">
+        <em>minha primeira volta ao sol</em>
+      </span>
+    </button>
+    <span class="date-pill">14 • 11 • 2026</span>
+  </header>
+
+  <nav class="main-nav" aria-label="Navegação principal">
+    <button class="nav-btn active" data-go="booth">📸 Tirar foto</button>
+    <button class="nav-btn" data-go="gallery">🖼️ Galeria</button>
+  </nav>
+
+  <main>
+    <section id="boothView" class="view active">
+      <div id="welcomeScreen" class="screen welcome">
+        <div class="hero-frame">
+          <img src="/assets/moldura-turma-apolo-completa.png" alt="" class="hero-art">
+        </div>
+        <p class="eyebrow">CABINE FOTOGRÁFICA DO APOLO</p>
+        <h1>Registre sua aventura!</h1>
+        <p class="lead">Tire uma foto, escolha sua moldura favorita e leve uma lembrança desse dia.</p>
+        <div class="stack">
+          <button class="primary" id="startCamera">📷 TIRAR MINHA FOTO</button>
+          <button class="secondary" id="chooseGallery">🖼️ ESCOLHER DA GALERIA</button>
+        </div>
+        <p class="privacy">Sua foto só vai para a galeria se você escolher publicar.</p>
+      </div>
+
+      <div id="editScreen" class="screen hidden">
+        <div class="step-head">
+          <p class="eyebrow" id="stepEyebrow">ETAPA 1 DE 3</p>
+          <h2 id="stepTitle">Escolha sua moldura</h2>
+          <div class="progress"><i class="on"></i><i></i><i></i></div>
+        </div>
+
+        <div class="photo-stage" id="photoStage">
+          <video id="camera" autoplay playsinline muted></video>
+          <img id="sourcePhoto" alt="" class="hidden">
+          <canvas id="makeupPreview"></canvas>
+          <img id="framePreview" alt="" class="frame-overlay">
+          <div id="cameraPlaceholder" class="camera-placeholder">Abrindo câmera…</div>
+          <div id="countdown" class="countdown hidden"></div>
+        </div>
+
+        <div id="framePanel">
+          <div id="frameGrid" class="choice-grid frames"></div>
+        </div>
+
+        <div id="effectsPanel" class="hidden">
+          <div class="effect-tabs">
+            <button class="effect-tab active" data-effect-tab="makeup">💄 Maquiagem</button>
+            <button class="effect-tab" data-effect-tab="light">✨ Luz & Cor</button>
+          </div>
+
+          <div id="makeupPanel" class="effect-panel">
+            <div class="effect-group">
+              <div class="effect-label"><strong>Batom</strong><button class="mini-link" data-clear="lipstick">Limpar</button></div>
+              <div class="chips" data-options="lipstick"></div>
+            </div>
+            <div class="effect-group">
+              <div class="effect-label"><strong>Cílios</strong><button class="mini-link" data-clear="lashes">Limpar</button></div>
+              <div class="chips" data-options="lashes"></div>
+            </div>
+            <div class="effect-group">
+              <div class="effect-label"><strong>Blush</strong><button class="mini-link" data-clear="blush">Limpar</button></div>
+              <div class="chips" data-options="blush"></div>
+            </div>
+            <div class="effect-group">
+              <div class="effect-label"><strong>Intensidade</strong><span id="makeupIntensityLabel">60%</span></div>
+              <input id="makeupIntensity" type="range" min="0" max="100" value="60">
+            </div>
+            <div class="effect-actions">
+              <button class="secondary small" id="noMakeup">Sem maquiagem</button>
+              <button class="secondary small" id="clearAll">Limpar tudo</button>
+            </div>
+            <p class="effect-note" id="faceStatus">Carregando reconhecimento facial…</p>
+          </div>
+
+          <div id="lightPanel" class="effect-panel hidden">
+            <div class="choice-grid filters" id="filterGrid"></div>
+          </div>
+        </div>
+
+        <p class="camera-error hidden" id="cameraError"></p>
+
+        <div class="bottom-actions" id="stepActions">
+          <button class="secondary" id="backBtn">← Voltar</button>
+          <button class="primary" id="nextBtn">Continuar →</button>
+        </div>
+      </div>
+
+      <div id="resultScreen" class="screen result hidden">
+        <div class="sparkle">✨</div>
+        <p class="eyebrow">ETAPA 3 DE 3</p>
+        <h2>Memória registrada!</h2>
+        <div class="final-card"><img id="resultImage" alt="Sua foto do Safari do Apolo"></div>
+        <p class="lead">Obrigado por fazer parte da minha primeira volta ao sol.</p>
+        <div class="stack">
+          <button class="primary" id="saveBtn">⬇️ SALVAR FOTO</button>
+          <button class="secondary" id="shareBtn">↗️ COMPARTILHAR</button>
+          <button class="secondary gallery-add" id="publishBtn">🌿 ADICIONAR À GALERIA</button>
+          <button class="text-btn" id="againBtn">↻ Fazer outra</button>
+        </div>
+        <p id="publishStatus" class="status"></p>
+        <footer>Salve sua lembrança antes de sair 💚</footer>
+      </div>
+
+      <input type="file" id="fileInput" accept="image/*" hidden>
+    </section>
+
+    <section id="galleryView" class="view">
+      <div class="gallery-head">
+        <p class="eyebrow">MEMÓRIAS DA FESTA</p>
+        <h1>Galeria de Aventuras</h1>
+        <p class="lead">As lembranças compartilhadas pelos convidados aparecem aqui.</p>
+        <button id="adminEntry" class="mini-link admin-entry">Administrar galeria</button>
+      </div>
+      <div id="galleryEmpty" class="empty hidden">Ainda não há fotos na galeria. Seja a primeira pessoa a registrar uma aventura 🌿</div>
+      <div id="galleryGrid" class="gallery-grid"></div>
+    </section>
+  </main>
+
+  <div id="photoModal" class="modal hidden" role="dialog" aria-modal="true">
+    <button class="modal-close" id="closePhotoModal">×</button>
+    <img id="modalPhoto" alt="Foto ampliada">
+    <div class="modal-actions">
+      <a id="modalDownload" class="primary button-link" download="safari-do-apolo.jpg">Salvar</a>
+      <button class="secondary" id="modalShare">Compartilhar</button>
+      <button class="danger hidden" id="modalHide">Ocultar</button>
+      <button class="danger hidden" id="modalDelete">Excluir</button>
+    </div>
+  </div>
+
+  <div id="loginModal" class="modal login-modal hidden" role="dialog" aria-modal="true">
+    <div class="login-card">
+      <button class="modal-close" id="closeLogin">×</button>
+      <p class="eyebrow">ÁREA DA ADMINISTRADORA</p>
+      <h2>Entrar</h2>
+      <label>E-mail<input id="adminEmail" type="email" autocomplete="username"></label>
+      <label>Senha<input id="adminPassword" type="password" autocomplete="current-password"></label>
+      <button class="primary" id="loginBtn">Entrar</button>
+      <button class="text-btn hidden" id="logoutBtn">Sair da administração</button>
+      <p id="loginStatus" class="status"></p>
+    </div>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
