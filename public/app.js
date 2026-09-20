@@ -75,9 +75,15 @@ function showSection(which){
   }
 }
 
-els.cameraTab.onclick=()=>showSection("camera");
+els.cameraTab.onclick=async()=>{
+  showSection("camera");
+  if(!state.stream && state.sourceType!=="image") await startCamera();
+};
 els.galleryTab.onclick=()=>showSection("gallery");
-$("#brandHome").onclick=()=>showSection("camera");
+$("#brandHome").onclick=async()=>{
+  showSection("camera");
+  if(!state.stream && state.sourceType!=="image") await startCamera();
+};
 
 function syncFrame(){
   const src=frames[state.frame][1];
@@ -249,35 +255,53 @@ async function loadImage(src){
 async function drawBranding(ctx,w){
   if(!frames[state.frame][1])return;
   const logo=await loadImage("/assets/apolo-lettering.png");
-  const y=36;
+  const y=34;
 
   ctx.save();
   ctx.textAlign="center";
 
-  ctx.fillStyle="#77564c";
-  ctx.font="800 25px Georgia";
-  ctx.shadowColor="rgba(255,255,255,.95)";
+  // SAFÁRI DO — relevo claro + sombra marrom
+  ctx.font="800 26px Georgia";
+  ctx.fillStyle="#79574c";
+  ctx.shadowColor="rgba(255,255,255,.98)";
   ctx.shadowBlur=2;
-  ctx.shadowOffsetX=-1;
-  ctx.shadowOffsetY=-1;
+  ctx.shadowOffsetX=-2;
+  ctx.shadowOffsetY=-2;
+  ctx.fillText("SAFÁRI DO",w/2,y+28);
+  ctx.shadowColor="rgba(112,78,66,.55)";
+  ctx.shadowBlur=2;
+  ctx.shadowOffsetX=2;
+  ctx.shadowOffsetY=3;
   ctx.fillText("SAFÁRI DO",w/2,y+28);
 
-  ctx.shadowColor="rgba(65,79,42,.25)";
-  ctx.shadowBlur=3;
-  ctx.shadowOffsetX=1;
-  ctx.shadowOffsetY=2;
-  ctx.drawImage(logo,w/2-118,y+34,236,88);
-
-  ctx.fillStyle="#77564c";
-  ctx.font="800 22px Georgia";
-  ctx.shadowColor="rgba(255,255,255,.92)";
-  ctx.shadowBlur=2;
+  // Apolo — lettering original verde com relevo suave
+  ctx.shadowColor="rgba(255,255,255,.62)";
+  ctx.shadowBlur=1;
   ctx.shadowOffsetX=-1;
   ctx.shadowOffsetY=-1;
-  ctx.fillText("14 • 11 • 2026",w/2,y+145);
+  ctx.drawImage(logo,w/2-120,y+35,240,90);
+  ctx.shadowColor="rgba(66,80,40,.25)";
+  ctx.shadowBlur=3;
+  ctx.shadowOffsetX=2;
+  ctx.shadowOffsetY=3;
+  ctx.drawImage(logo,w/2-120,y+35,240,90);
+
+  // Data — mesmo relevo do título
+  ctx.font="800 23px Georgia";
+  ctx.fillStyle="#79574c";
+  ctx.shadowColor="rgba(255,255,255,.98)";
+  ctx.shadowBlur=2;
+  ctx.shadowOffsetX=-2;
+  ctx.shadowOffsetY=-2;
+  ctx.fillText("14 • 11 • 2026",w/2,y+151);
+  ctx.shadowColor="rgba(112,78,66,.55)";
+  ctx.shadowBlur=2;
+  ctx.shadowOffsetX=2;
+  ctx.shadowOffsetY=3;
+  ctx.fillText("14 • 11 • 2026",w/2,y+151);
+
   ctx.restore();
 }
-
 async function composeMedia(media,mirror=false){
   const w=1122,h=1402;
   const canvas=document.createElement("canvas");
@@ -626,3 +650,8 @@ renderFrames();
 syncFrame();
 showPlaceholder();
 updateGalleryCount();
+setTimeout(()=>{
+  if(document.visibilityState==="visible" && !state.stream && state.sourceType!=="image"){
+    startCamera().catch(()=>{});
+  }
+},300);
