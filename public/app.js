@@ -65,39 +65,7 @@ function roundedMaskPath(ctx,x,y,w,h,r){
   ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
 }
 async function getOpenFrame(index){
-  const src=frames[index][1];
-  if(!src) return null;
-  if(processedFrameCache.has(index)) return processedFrameCache.get(index);
-  const im=await loadImage(src);
-  const c=document.createElement("canvas");c.width=1080;c.height=1350;const ctx=c.getContext("2d");
-
-  ctx.save();
-  ctx.globalAlpha=.90;
-  ctx.drawImage(im,0,0,c.width,c.height);
-  ctx.restore();
-
-  const profiles=[
-    {x:72,y:70,w:936,h:1040,r:72},  // animais
-    {x:68,y:62,w:944,h:875,r:72},   // jipe
-    {x:62,y:62,w:956,h:1160,r:72},  // girafa
-    {x:62,y:62,w:956,h:1160,r:72},  // elefante
-    {x:178,y:60,w:840,h:1140,r:74}, // leão esquerda
-    {x:62,y:60,w:840,h:1140,r:74},  // leão direita
-    {x:72,y:62,w:936,h:875,r:72}    // turma
-  ];
-  const cut=profiles[index];
-  if(cut){
-    ctx.save();
-    ctx.globalCompositeOperation="destination-out";
-    ctx.filter="blur(3px)";
-    ctx.fillStyle="#000";
-    roundedMaskPath(ctx,cut.x,cut.y,cut.w,cut.h,cut.r);
-    ctx.fill();
-    ctx.restore();
-  }
-  const out=c.toDataURL("image/png");
-  processedFrameCache.set(index,out);
-  return out;
+  return frames[index][1] || null;
 }
 async function syncFrame(){
   const src=await getOpenFrame(state.frame);
@@ -137,14 +105,10 @@ function renderMakeup(){
     });
   });
 }
-function setStudioTab(tab){
-  state.studioTab=tab;
-  $$(".studio-tab").forEach(b=>b.classList.toggle("active",b.dataset.studioTab===tab));
-  els.framePanel.classList.toggle("hidden",tab!=="frames");
-  $("#lightPanel").classList.toggle("hidden",tab!=="filters");
-  $("#makeupPanel").classList.toggle("hidden",tab!=="makeup");
-  els.effectsPanel.classList.toggle("hidden",tab==="frames");
-  // Foto da galeria precisa de um botão para finalizar; na câmera o obturador faz isso.
+function setStudioTab(){
+  state.studioTab="frames";
+  els.framePanel.classList.remove("hidden");
+  els.effectsPanel.classList.add("hidden");
   els.next.classList.toggle("hidden",state.sourceType!=="image");
   els.next.textContent="Finalizar foto";
   els.back.textContent="← Voltar";
@@ -165,9 +129,9 @@ async function chooseFiles(files){
 }
 async function loadCurrentSource(){
   const item=state.sources[state.sourceIndex]; if(!item) return;
-  els.source.onload=async()=>{
+  els.source.onload=()=>{
     els.source.classList.remove("hidden"); els.video.classList.add("hidden"); els.placeholder.classList.add("hidden");
-    els.makeup.classList.remove("mirror"); await detectImageFace(); drawPreviewMakeup();
+    els.makeup.classList.add("hidden");
   };
   els.source.src=item.dataUrl;
 }
@@ -199,8 +163,8 @@ async function startCamera(){
     });
     els.video.srcObject=state.stream; await els.video.play(); els.placeholder.classList.add("hidden");
     els.switchCamera.classList.remove("hidden"); els.shutter.classList.remove("hidden"); els.nativeCamera.classList.add("hidden");
-    els.video.classList.toggle("mirror",state.facing==="user"); els.makeup.classList.toggle("mirror",state.facing==="user");
-    await ensureFaceLandmarker("VIDEO"); requestAnimationFrame(faceLoop);
+    els.video.classList.toggle("mirror",state.facing==="user");
+    els.makeup.classList.add("hidden");
   }catch(e){
     console.warn(e);
     els.error.textContent="Não conseguimos abrir a câmera dentro do site. Verifique a permissão da câmera no navegador ou use a câmera do celular.";
@@ -336,13 +300,16 @@ async function drawBranding(ctx,w,h){
   ctx.fillText("14 • 11 • 2026",w/2+165,y+28);
   ctx.restore();
 }
-async function composeMedia(media,landmarks,mirror=false){
+async function composeMedia(media,_landmarks,mirror=false){
   const w=1080,h=1350,c=document.createElement("canvas");c.width=w;c.height=h;const ctx=c.getContext("2d");
-  ctx.filter=filters[state.filter][1];drawCover(ctx,media,w,h,mirror);ctx.filter="none";drawMakeup(ctx,landmarks,w,h,media.videoWidth||media.naturalWidth||w,media.videoHeight||media.naturalHeight||h,mirror);
+  ctx.filter="none";
+  drawCover(ctx,media,w,h,mirror);
   const f=await getOpenFrame(state.frame);
   if(f){
     const im=await loadImage(f);
-    ctx.drawImage(im,0,0,w,h);
+    const scale=.95;
+    const fw=w*scale,fh=h*scale;
+    ctx.drawImage(im,(w-fw)/2,(h-fh)/2,fw,fh);
     await drawBranding(ctx,w,h);
   }
   return c.toDataURL("image/jpeg",.92);
@@ -352,7 +319,7 @@ async function composeCurrent(){
   return composeMedia(els.source,state.landmarks,false);
 }
 async function composeSource(dataUrl){
-  const im=await loadImage(dataUrl),lm=await detectImageFaceFor(im);return composeMedia(im,lm,false);
+  const im=await loadImage(dataUrl);return composeMedia(im,null,false);
 }
 
 async function capture(){
@@ -406,7 +373,7 @@ function resetBooth(){
   stopCamera();state.result=null;state.landmarks=null;state.studioTab="frames";state.frame=0;state.filter=0;state.sources=[];state.sourceIndex=0;
   state.makeup={lipstick:null,lashes:"none",blush:null,intensity:.60};els.selectedStrip.classList.add("hidden");
   els.publishStatus.textContent="";$("#publishBtn").textContent="🌿 ADICIONAR À GALERIA";els.switchCamera.classList.add("hidden");els.shutter.classList.add("hidden");els.nativeCamera.classList.add("hidden");
-  renderFrames();renderFilters();renderMakeup();syncFrame();showScreen("welcome");
+  renderFrames();syncFrame();showScreen("welcome");
 }
 function navTo(which){
   $$(".view").forEach(v=>v.classList.remove("active"));$("#"+which+"View").classList.add("active");
@@ -427,12 +394,6 @@ els.next.onclick=()=>capture();
 els.back.onclick=()=>resetBooth();
 
 $("#saveBtn").onclick=saveResult;$("#shareBtn").onclick=shareResult;$("#publishBtn").onclick=publishResult;$("#againBtn").onclick=resetBooth;
-
-$$(".studio-tab").forEach(b=>b.onclick=()=>setStudioTab(b.dataset.studioTab));
-$$("[data-clear]").forEach(b=>b.onclick=()=>{const k=b.dataset.clear;state.makeup[k]=k==="lashes"?"none":null;renderMakeup();drawPreviewMakeup()});
-$("#noMakeup").onclick=()=>{state.makeup={...state.makeup,lipstick:null,lashes:"none",blush:null};renderMakeup();drawPreviewMakeup()};
-$("#clearAll").onclick=()=>{state.makeup={lipstick:null,lashes:"none",blush:null,intensity:.60};state.filter=0;$("#makeupIntensity").value=60;$("#makeupIntensityLabel").textContent="60%";renderMakeup();renderFilters();setFilterPreview();drawPreviewMakeup()};
-$("#makeupIntensity").oninput=e=>{state.makeup.intensity=Number(e.target.value)/100;$("#makeupIntensityLabel").textContent=e.target.value+"%";drawPreviewMakeup()};
 
 async function galleryFile(p){
   const r=await fetch("/api/photos/"+p.id+"/image");
@@ -563,5 +524,5 @@ $("#loginBtn").onclick=async()=>{
 };
 $("#logoutBtn").onclick=async()=>{await fetch("/api/logout",{method:"POST"});$("#loginModal").classList.add("hidden");loadGallery()};
 
-renderFrames();renderFilters();renderMakeup();syncFrame();setFilterPreview();setStudioTab("frames");
+renderFrames();syncFrame();setStudioTab();
 window.addEventListener("resize",drawPreviewMakeup);
