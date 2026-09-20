@@ -46,10 +46,10 @@
       </div>
 
       <div id="editScreen" class="screen hidden">
-        <div class="step-head">
-          <p class="eyebrow" id="stepEyebrow">ETAPA 1 DE 3</p>
-          <h2 id="stepTitle">Escolha sua moldura</h2>
-          <div class="progress"><i class="on"></i><i></i><i></i></div>
+        <div class="studio-head">
+          <p class="eyebrow">CABINE FOTOGRÁFICA</p>
+          <h2>Monte sua foto</h2>
+          <p>Escolha moldura, filtro e maquiagem sem sair da câmera.</p>
         </div>
 
         <div id="selectedStrip" class="selected-strip hidden"></div><div class="photo-stage" id="photoStage">
@@ -58,7 +58,8 @@
           <canvas id="makeupPreview"></canvas>
           <img id="framePreview" alt="" class="frame-overlay">
           <div class="frame-branding">
-            <span class="frame-logo"><small>SAFARI DO</small><img src="/assets/apolo-lettering.png" alt="Apolo"></span>
+            <small class="frame-safari">SAFARI DO</small>
+            <img src="/assets/apolo-lettering.png" alt="Apolo" class="frame-apolo">
             <small class="frame-date">14 • 11 • 2026</small>
           </div>
           <button class="camera-switch-inside hidden" id="switchCameraBtn" aria-label="Trocar câmera">↻</button>
@@ -68,17 +69,18 @@
         </div>
         <button class="secondary small hidden" id="nativeCameraBtn">📷 Usar câmera do celular</button>
 
-        <div id="framePanel">
+        <div class="studio-tabs">
+          <button class="studio-tab active" data-studio-tab="frames">🌿 Molduras</button>
+          <button class="studio-tab" data-studio-tab="filters">✨ Filtros</button>
+          <button class="studio-tab" data-studio-tab="makeup">💄 Maquiagem</button>
+        </div>
+
+        <div id="framePanel" class="studio-panel">
           <div id="frameGrid" class="choice-grid frames"></div>
         </div>
 
-        <div id="effectsPanel" class="hidden">
-          <div class="effect-tabs">
-            <button class="effect-tab active" data-effect-tab="makeup">💄 Maquiagem</button>
-            <button class="effect-tab" data-effect-tab="light">✨ Luz & Cor</button>
-          </div>
-
-          <div id="makeupPanel" class="effect-panel">
+        <div id="effectsPanel">
+          <div id="makeupPanel" class="effect-panel hidden">
             <div class="effect-group">
               <div class="effect-label"><strong>Batom</strong><button class="mini-link" data-clear="lipstick">Limpar</button></div>
               <div class="chips" data-options="lipstick"></div>
@@ -102,16 +104,16 @@
             <p class="effect-note" id="faceStatus">Carregando reconhecimento facial…</p>
           </div>
 
-          <div id="lightPanel" class="effect-panel hidden">
+          <div id="lightPanel" class="effect-panel hidden studio-panel">
             <div class="choice-grid filters" id="filterGrid"></div>
           </div>
         </div>
 
         <p class="camera-error hidden" id="cameraError"></p><button class="secondary hidden" id="nativeCameraFallback">Abrir câmera do celular</button>
 
-        <div class="bottom-actions" id="stepActions">
+        <div class="bottom-actions single-back" id="stepActions">
           <button class="secondary" id="backBtn">← Voltar</button>
-          <button class="primary" id="nextBtn">Continuar →</button>
+          <button class="primary hidden" id="nextBtn">Finalizar foto</button>
         </div>
       </div>
 
