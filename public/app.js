@@ -45,7 +45,7 @@ const els = {
   framePanel:$("#framePanel"), effectsPanel:$("#effectsPanel"), filterGrid:$("#filterGrid"),
   stepEyebrow:$("#stepEyebrow"), stepTitle:$("#stepTitle"), progress:$$(".progress i"),
   back:$("#backBtn"), next:$("#nextBtn"), error:$("#cameraError"), file:$("#fileInput"),
-  cameraInput:$("#cameraInput"), selectedStrip:$("#selectedStrip"), switchCamera:$("#switchCameraBtn"), nativeCamera:$("#nativeCameraBtn"),
+  cameraInput:$("#cameraInput"), selectedStrip:$("#selectedStrip"), switchCamera:$("#switchCameraBtn"), nativeCamera:$("#nativeCameraBtn"), shutter:$("#shutterBtn"),
   resultImage:$("#resultImage"), publishStatus:$("#publishStatus"), faceStatus:$("#faceStatus"),
   galleryGrid:$("#galleryGrid"), galleryEmpty:$("#galleryEmpty"), branding:$(".frame-branding")
 };
@@ -145,7 +145,7 @@ function dataURL(file){
 }
 async function chooseFiles(files){
   const valid=[...files].filter(f=>f.type.startsWith("image/")); if(!valid.length) return;
-  stopCamera(); els.switchCamera.classList.add("hidden"); els.nativeCamera.classList.add("hidden");
+  stopCamera(); els.switchCamera.classList.add("hidden"); els.shutter.classList.add("hidden"); els.nativeCamera.classList.add("hidden");
   state.sources=await Promise.all(valid.map(async f=>({name:f.name||"foto",dataUrl:await dataURL(f)})));
   state.sourceIndex=0; state.sourceType="image"; state.result=null;
   showScreen("edit"); state.step=1; updateStep(); renderSelectedStrip(); await loadCurrentSource();
@@ -171,9 +171,9 @@ function renderSelectedStrip(){
 }
 
 async function startCamera(){
-  showScreen("edit"); state.step=1; updateStep(); state.sourceType="camera"; state.sources=[];
+  showScreen("edit"); state.step=1; updateStep(); state.sourceType="camera"; state.sources=[]; await syncFrame();
   els.selectedStrip.classList.add("hidden"); els.source.classList.add("hidden"); els.video.classList.remove("hidden"); els.placeholder.classList.remove("hidden");
-  els.placeholder.textContent="Abrindo câmera…"; els.switchCamera.classList.add("hidden"); els.nativeCamera.classList.add("hidden");
+  els.placeholder.textContent="Abrindo câmera…"; els.switchCamera.classList.add("hidden"); els.shutter.classList.add("hidden"); els.nativeCamera.classList.add("hidden");
   stopCamera(); els.error.classList.add("hidden");
   if(!navigator.mediaDevices?.getUserMedia){
     els.error.textContent="Este navegador não liberou a câmera dentro do site.";
@@ -185,13 +185,13 @@ async function startCamera(){
       video:{facingMode:{ideal:state.facing},width:{ideal:1280},height:{ideal:1600}},audio:false
     });
     els.video.srcObject=state.stream; await els.video.play(); els.placeholder.classList.add("hidden");
-    els.switchCamera.classList.remove("hidden"); els.nativeCamera.classList.add("hidden");
+    els.switchCamera.classList.remove("hidden"); els.shutter.classList.remove("hidden"); els.nativeCamera.classList.add("hidden");
     els.video.classList.toggle("mirror",state.facing==="user"); els.makeup.classList.toggle("mirror",state.facing==="user");
     await ensureFaceLandmarker("VIDEO"); requestAnimationFrame(faceLoop);
   }catch(e){
     console.warn(e);
     els.error.textContent="Não conseguimos abrir a câmera dentro do site. Verifique a permissão da câmera no navegador ou use a câmera do celular.";
-    els.error.classList.remove("hidden"); els.nativeCamera.classList.remove("hidden"); els.placeholder.textContent="Câmera bloqueada";
+    els.error.classList.remove("hidden"); els.nativeCamera.classList.remove("hidden"); els.shutter.classList.add("hidden"); els.placeholder.textContent="Câmera bloqueada";
   }
 }
 
@@ -258,13 +258,18 @@ function drawCover(ctx,media,w,h,mirror=false){
 }
 async function loadImage(src){const im=new Image();im.src=src;await im.decode();return im}
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r)}
-function drawBranding(ctx,w,h){
+async function drawBranding(ctx,w,h){
   if(!frames[state.frame][1])return;
-  const text1="SAFARI DO APOLO",text2="14 • 11 • 2026";
-  ctx.save();ctx.font="700 25px Arial";const tw=Math.max(ctx.measureText(text1).width,ctx.measureText(text2).width);const bw=tw+48,bh=72,x=(w-bw)/2,y=h-94;
-  ctx.fillStyle="rgba(255,250,240,.90)";roundRect(ctx,x,y,bw,bh,36);ctx.fill();
-  ctx.strokeStyle="rgba(129,146,106,.75)";ctx.lineWidth=2;ctx.stroke();
-  ctx.fillStyle="#3f4b3b";ctx.textAlign="center";ctx.font="800 24px Arial";ctx.fillText(text1,w/2,y+29);ctx.font="700 20px Arial";ctx.fillText(text2,w/2,y+55);ctx.restore();
+  const logo=await loadImage("/assets/apolo-lettering.png");
+  const bw=650,bh=82,x=(w-bw)/2,y=24;
+  ctx.save();
+  ctx.fillStyle="rgba(255,250,240,.92)";roundRect(ctx,x,y,bw,bh,41);ctx.fill();
+  ctx.strokeStyle="rgba(129,146,106,.76)";ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle="#3f4b3b";ctx.textAlign="left";ctx.font="800 20px Arial";ctx.fillText("SAFARI DO",x+35,y+49);
+  ctx.drawImage(logo,x+154,y+17,145,50);
+  ctx.strokeStyle="rgba(100,113,84,.30)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+340,y+16);ctx.lineTo(x+340,y+66);ctx.stroke();
+  ctx.fillStyle="#3f4b3b";ctx.font="800 20px Arial";ctx.fillText("14 • 11 • 2026",x+374,y+49);
+  ctx.restore();
 }
 async function composeMedia(media,landmarks,mirror=false){
   const w=1080,h=1350,c=document.createElement("canvas");c.width=w;c.height=h;const ctx=c.getContext("2d");
@@ -273,7 +278,7 @@ async function composeMedia(media,landmarks,mirror=false){
   if(f){
     const im=await loadImage(f);
     ctx.drawImage(im,0,0,w,h);
-    drawBranding(ctx,w,h);
+    await drawBranding(ctx,w,h);
   }
   return c.toDataURL("image/jpeg",.92);
 }
@@ -335,7 +340,7 @@ async function publishAllResults(){
 function resetBooth(){
   stopCamera();state.result=null;state.landmarks=null;state.step=1;state.frame=0;state.filter=0;state.sources=[];state.sourceIndex=0;
   state.makeup={lipstick:null,lashes:"none",blush:null,intensity:.60};els.selectedStrip.classList.add("hidden");
-  els.publishStatus.textContent="";$("#publishBtn").textContent="🌿 ADICIONAR À GALERIA";els.switchCamera.classList.add("hidden");els.nativeCamera.classList.add("hidden");
+  els.publishStatus.textContent="";$("#publishBtn").textContent="🌿 ADICIONAR À GALERIA";els.switchCamera.classList.add("hidden");els.shutter.classList.add("hidden");els.nativeCamera.classList.add("hidden");
   renderFrames();renderFilters();renderMakeup();syncFrame();showScreen("welcome");
 }
 function navTo(which){
@@ -347,6 +352,7 @@ $$("[data-go]").forEach(b=>b.onclick=()=>navTo(b.dataset.go));
 
 $("#startCamera").onclick=startCamera; $("#nativeCameraFallback").onclick=()=>{els.cameraInput.value="";els.cameraInput.click()};
 els.switchCamera.onclick=async()=>{state.facing=state.facing==="user"?"environment":"user";await startCamera()};
+els.shutter.onclick=()=>capture();
 els.nativeCamera.onclick=()=>{els.cameraInput.value="";els.cameraInput.click()};
 $("#chooseGallery").onclick=()=>{els.file.value="";els.file.click()};
 els.file.onchange=e=>chooseFiles(e.target.files||[]);
