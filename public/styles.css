@@ -920,3 +920,88 @@ body.studio-mode .studio-head span{
   .tag-apolo{width:122px!important;height:44px!important;top:26px!important}
   .tag-date{font-size:.48rem!important}
 }
+
+/* v14 — correção visual baseada no último print */
+.frame-overlay{
+  transform:var(--frame-transform,scale(.97))!important;
+  transform-origin:center center!important;
+  object-fit:contain!important;
+  opacity:1!important;
+}
+
+/* Tag menor, centralizada e proporcional à referência enviada */
+.frame-branding{
+  position:absolute!important;
+  z-index:7!important;
+  left:50%!important;
+  top:9px!important;
+  transform:translateX(-50%)!important;
+  width:146px!important;
+  height:96px!important;
+  max-width:none!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:9px!important;
+  background:
+    linear-gradient(135deg,rgba(249,247,237,.56),rgba(225,232,214,.40))!important;
+  backdrop-filter:blur(4px)!important;
+  box-shadow:
+    0 3px 10px rgba(58,49,40,.10),
+    inset 0 1px 0 rgba(255,255,255,.58)!important;
+  overflow:hidden!important;
+}
+.tag-safari{
+  position:absolute!important;
+  left:50%!important;
+  top:8px!important;
+  transform:translateX(-50%)!important;
+  width:100%!important;
+  text-align:center!important;
+  font-family:Georgia,"Times New Roman",serif!important;
+  font-size:.49rem!important;
+  font-weight:800!important;
+  letter-spacing:.17em!important;
+  color:#76554d!important;
+  text-shadow:
+    -1px -1px 0 rgba(255,255,255,.90),
+     1px 1px 1px rgba(100,78,68,.20)!important;
+}
+.tag-apolo{
+  position:absolute!important;
+  left:50%!important;
+  top:24px!important;
+  transform:translateX(-50%)!important;
+  width:110px!important;
+  height:40px!important;
+  object-fit:contain!important;
+  filter:drop-shadow(1px 2px 1px rgba(69,82,43,.16))!important;
+}
+.tag-date{
+  position:absolute!important;
+  left:50%!important;
+  right:auto!important;
+  bottom:9px!important;
+  transform:translateX(-50%)!important;
+  width:100%!important;
+  text-align:center!important;
+  font-family:Georgia,"Times New Roman",serif!important;
+  font-size:.45rem!important;
+  font-weight:800!important;
+  letter-spacing:.12em!important;
+  color:#76554d!important;
+  text-shadow:
+    -1px -1px 0 rgba(255,255,255,.88),
+     1px 1px 1px rgba(100,78,68,.20)!important;
+}
+
+/* miniaturas mostram o desenho inteiro sem recorte */
+body.studio-mode .choice-grid.frames .choice-thumb img{
+  transform:scale(.92)!important;
+  object-fit:contain!important;
+}
+@media(max-width:380px){
+  .frame-branding{width:138px!important;height:91px!important}
+  .tag-safari{font-size:.46rem!important}
+  .tag-apolo{width:104px!important;height:38px!important;top:23px!important}
+  .tag-date{font-size:.42rem!important}
+}
