@@ -324,12 +324,12 @@ async function drawBranding(ctx,w){
   ctx.shadowBlur=1;
   ctx.shadowOffsetX=-1;
   ctx.shadowOffsetY=-1;
-  ctx.drawImage(logo,w/2-112,y+34,224,82);
+  ctx.drawImage(logo,w/2-112,y+34,224,112);
   ctx.shadowColor="rgba(66,80,40,.25)";
   ctx.shadowBlur=3;
   ctx.shadowOffsetX=2;
   ctx.shadowOffsetY=3;
-  ctx.drawImage(logo,w/2-112,y+34,224,82);
+  ctx.drawImage(logo,w/2-112,y+34,224,112);
 
   // Data — mesmo relevo do título
   ctx.font="800 22px Georgia";
@@ -338,12 +338,12 @@ async function drawBranding(ctx,w){
   ctx.shadowBlur=2;
   ctx.shadowOffsetX=-2;
   ctx.shadowOffsetY=-2;
-  ctx.fillText("14 • 11 • 2026",w/2,y+138);
+  ctx.fillText("14 • 11 • 2026",w/2,y+164);
   ctx.shadowColor="rgba(112,78,66,.55)";
   ctx.shadowBlur=2;
   ctx.shadowOffsetX=2;
   ctx.shadowOffsetY=3;
-  ctx.fillText("14 • 11 • 2026",w/2,y+138);
+  ctx.fillText("14 • 11 • 2026",w/2,y+164);
 
   ctx.restore();
 }
