@@ -140,3 +140,53 @@ body{background:radial-gradient(circle at 50% 14%,rgba(169,183,148,.16),transpar
   .shutter{width:68px;height:68px;bottom:15px}
   .shutter span{width:52px;height:52px}
 }
+
+/* Galeria — ações sempre visíveis */
+.gallery-grid{
+  width:min(100% - 20px,860px);
+  margin:0 auto 56px;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr);
+  gap:16px;
+  columns:auto!important;
+}
+.gallery-item{
+  position:relative;
+  margin:0;
+  border-radius:12px;
+  overflow:hidden;
+  background:var(--cream2);
+  border:1px solid var(--line);
+  box-shadow:0 12px 30px rgba(63,75,59,.10);
+}
+.gallery-photo-button{
+  display:block;width:100%;padding:0;border:0;background:#e9e1d2;cursor:zoom-in
+}
+.gallery-photo-button img{width:100%;display:block}
+.gallery-actions{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;padding:10px
+}
+.gallery-action{
+  min-width:0;min-height:42px;padding:8px 7px;
+  border:1px solid var(--line);border-radius:7px;
+  background:#fffaf1;color:var(--forest);
+  font-size:.70rem;font-weight:800;line-height:1.1
+}
+.gallery-action:active{transform:scale(.98)}
+.gallery-action:disabled{opacity:.55}
+.gallery-action.stories{background:#f7efe8}
+.gallery-action.whatsapp{background:#eef5e9}
+.gallery-action.facebook{background:#eef1f6}
+.gallery-admin-actions{
+  display:grid;grid-template-columns:1fr 1fr;gap:7px;
+  padding:0 10px 10px
+}
+.gallery-admin-actions .gallery-action{min-height:44px}
+.gallery-action.admin-hide{background:#fff;color:#8a6c38}
+.gallery-action.admin-delete{background:#fff;color:var(--danger);border-color:#ddb8b8}
+.gallery-item.hidden-photo .gallery-photo-button img{opacity:.43}
+.gallery-admin-badge{z-index:3}
+@media(min-width:700px){
+  .gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
