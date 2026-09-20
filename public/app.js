@@ -84,7 +84,7 @@ async function syncFrame(){
   const tune=frameTuning[state.frame]||{scale:.84,y:0};
   if(src){
     els.frame.src=src;
-    els.frame.style.transform="translateY("+tune.y+"px) scale("+tune.scale+")";
+    els.frame.style.setProperty("--frame-transform","translateY("+tune.y+"px) scale("+tune.scale+")");
     els.frame.classList.remove("hidden");
     els.branding.classList.remove("hidden");
   }else{
