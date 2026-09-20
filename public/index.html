@@ -47,9 +47,8 @@
 
       <div id="editScreen" class="screen hidden">
         <div class="studio-head">
-          <p class="eyebrow">CABINE FOTOGRÁFICA</p>
-          <h2>Monte sua foto</h2>
-          <p>Escolha moldura, filtro e maquiagem sem sair da câmera.</p>
+          <strong>Cabine do Apolo</strong>
+          <span>Moldura, filtro e maquiagem ao vivo</span>
         </div>
 
         <div id="selectedStrip" class="selected-strip hidden"></div><div class="photo-stage" id="photoStage">
@@ -57,10 +56,8 @@
           <img id="sourcePhoto" alt="" class="hidden">
           <canvas id="makeupPreview"></canvas>
           <img id="framePreview" alt="" class="frame-overlay">
-          <div class="frame-branding">
-            <small class="frame-safari">SAFARI DO</small>
-            <img src="/assets/apolo-lettering.png" alt="Apolo" class="frame-apolo">
-            <small class="frame-date">14 • 11 • 2026</small>
+          <div class="frame-branding" aria-hidden="true">
+            <span class="brand-inline"><small>SAFARI DO</small><img src="/assets/apolo-lettering.png" alt=""><small>14 • 11 • 2026</small></span>
           </div>
           <button class="camera-switch-inside hidden" id="switchCameraBtn" aria-label="Trocar câmera">↻</button>
           <button class="shutter hidden" id="shutterBtn" aria-label="Tirar foto"><span></span></button>
@@ -112,7 +109,7 @@
         <p class="camera-error hidden" id="cameraError"></p><button class="secondary hidden" id="nativeCameraFallback">Abrir câmera do celular</button>
 
         <div class="bottom-actions single-back" id="stepActions">
-          <button class="secondary" id="backBtn">← Voltar</button>
+          <button class="secondary compact-back" id="backBtn">← Sair da câmera</button>
           <button class="primary hidden" id="nextBtn">Finalizar foto</button>
         </div>
       </div>
