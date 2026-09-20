@@ -29,6 +29,8 @@ const makeupOptions = {
   blush:[["Nenhum",null],["Rosado","#d97983"],["Pêssego","#df8c74"],["Bronze","#b67859"]]
 };
 
+const processedFrameCache = new Map();
+
 const state = {
   step:1, frame:0, filter:0, stream:null, sourceType:null, facing:"user",
   sources:[], sourceIndex:0, result:null, landmarks:null, landmarker:null, faceReady:false,
@@ -58,21 +60,53 @@ function isMobile(){ return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent
 function setFilterPreview(){
   const f=filters[state.filter][1]; els.video.style.filter=f; els.source.style.filter=f;
 }
-function syncFrame(){
-  const src=frames[state.frame][1];
-  els.frame.classList.toggle("frame-open",state.frame===2||state.frame===3);
+function roundedMaskPath(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+}
+async function getOpenFrame(index){
+  const src=frames[index][1];
+  if(!src) return null;
+  if(![0,2,3].includes(index)) return src;
+  if(processedFrameCache.has(index)) return processedFrameCache.get(index);
+  const im=await loadImage(src);
+  const c=document.createElement("canvas");c.width=1080;c.height=1350;const ctx=c.getContext("2d");
+  const scale=index===0?1.18:1.34;
+  const dw=c.width*scale,dh=c.height*scale;
+  ctx.drawImage(im,(c.width-dw)/2,(c.height-dh)/2,dw,dh);
+  // Abre o centro de verdade: remove a folhagem que invade a área da foto,
+  // mantendo animais/personagens nas laterais e a base decorativa.
+  const cut=index===0
+    ? {x:165,y:125,w:750,h:790,r:110}
+    : {x:185,y:115,w:710,h:900,r:105};
+  ctx.save();
+  ctx.globalCompositeOperation="destination-out";
+  ctx.filter="blur(7px)";
+  ctx.fillStyle="#000";
+  roundedMaskPath(ctx,cut.x,cut.y,cut.w,cut.h,cut.r);
+  ctx.fill();
+  ctx.restore();
+  const out=c.toDataURL("image/png");
+  processedFrameCache.set(index,out);
+  return out;
+}
+async function syncFrame(){
+  const src=await getOpenFrame(state.frame);
+  els.frame.classList.remove("frame-open");
   if(src){els.frame.src=src;els.frame.classList.remove("hidden");els.branding.classList.remove("hidden")}
   else {els.frame.classList.add("hidden");els.branding.classList.add("hidden")}
 }
 function renderFrames(){
   els.frameGrid.innerHTML="";
   frames.forEach(([name,src],i)=>{
-    const b=document.createElement("button"); b.className="choice-card"+(state.frame===i?" selected":"");
-    const cls=(i===2||i===3)?" style=\"transform:scale(1.12)\"":"";
-    b.innerHTML=src
-      ? '<span class="choice-thumb"><img src="'+src+'" alt=""'+cls+'></span><span>'+name+'</span>'
-      : '<span class="choice-thumb none">＋</span><span>'+name+'</span>';
-    b.onclick=()=>{state.frame=i;syncFrame();renderFrames()};
+    const b=document.createElement("button");b.className="choice-card"+(state.frame===i?" selected":"");
+    if(src){
+      b.innerHTML='<span class="choice-thumb"><img src="'+src+'" alt=""></span><span>'+name+'</span>';
+      const img=b.querySelector("img");getOpenFrame(i).then(u=>{if(u)img.src=u});
+    }else{
+      b.innerHTML='<span class="choice-thumb none">＋</span><span>'+name+'</span>';
+    }
+    b.onclick=async()=>{state.frame=i;await syncFrame();renderFrames()};
     els.frameGrid.appendChild(b);
   });
 }
@@ -235,10 +269,11 @@ function drawBranding(ctx,w,h){
 async function composeMedia(media,landmarks,mirror=false){
   const w=1080,h=1350,c=document.createElement("canvas");c.width=w;c.height=h;const ctx=c.getContext("2d");
   ctx.filter=filters[state.filter][1];drawCover(ctx,media,w,h,mirror);ctx.filter="none";drawMakeup(ctx,landmarks,w,h,mirror);
-  const f=frames[state.frame][1];
+  const f=await getOpenFrame(state.frame);
   if(f){
-    const im=await loadImage(f),s=(state.frame===2||state.frame===3)?1.13:1;
-    const dw=w*s,dh=h*s;ctx.drawImage(im,(w-dw)/2,(h-dh)/2,dw,dh);drawBranding(ctx,w,h);
+    const im=await loadImage(f);
+    ctx.drawImage(im,0,0,w,h);
+    drawBranding(ctx,w,h);
   }
   return c.toDataURL("image/jpeg",.92);
 }
@@ -346,7 +381,7 @@ $("#modalHide").onclick=async()=>{const p=state.modalPhoto;await fetch("/api/pho
 $("#modalDelete").onclick=async()=>{if(!confirm("Excluir esta foto da galeria?"))return;await fetch("/api/photos/"+state.modalPhoto.id,{method:"DELETE"});$("#photoModal").classList.add("hidden");loadGallery()};
 
 let adminSetupRequired=false;
-$("#adminEntry").onclick=async()=>{
+async function openAdminLogin(){
   const s=await(await fetch("/api/session")).json();
   adminSetupRequired=!!s.setupRequired;
   $("#loginModal").classList.remove("hidden");
@@ -354,14 +389,16 @@ $("#adminEntry").onclick=async()=>{
   $("#loginBtn").classList.toggle("hidden",s.admin);
   $("#adminEmail").value=s.adminEmail||"";
   $("#adminEmail").readOnly=!!s.adminEmail;
-  $("#loginBtn").textContent=adminSetupRequired?"Criar acesso":"Entrar";
+  $("#loginBtn").textContent=adminSetupRequired?"Criar minha senha":"Entrar";
   $("#loginHint").textContent=s.admin
     ?"Você está logada como administradora."
     : adminSetupRequired
-      ?"Primeiro acesso: crie agora uma senha só para administrar a galeria."
-      :"Entre com seu e-mail de administradora e a senha que você criou.";
+      ?"Primeiro acesso: confirme seu e-mail e crie sua senha de administradora."
+      :"Entre com seu e-mail e sua senha de administradora.";
   $("#loginStatus").textContent="";
-};
+}
+$("#adminEntry").onclick=openAdminLogin;
+$("#topAdminBtn").onclick=openAdminLogin;
 $("#closeLogin").onclick=()=>$("#loginModal").classList.add("hidden");
 $("#loginBtn").onclick=async()=>{
   const endpoint=adminSetupRequired?"/api/setup-admin":"/api/login";
