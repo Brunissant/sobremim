@@ -1005,3 +1005,22 @@ body.studio-mode .choice-grid.frames .choice-thumb img{
   .tag-apolo{width:104px!important;height:38px!important;top:23px!important}
   .tag-date{font-size:.42rem!important}
 }
+
+/* v15 — molduras encostadas nos quatro cantos da câmera */
+.frame-overlay{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:fill!important;
+  transform:none!important;
+  transform-origin:center center!important;
+  opacity:1!important;
+  pointer-events:none!important;
+}
+body.studio-mode .choice-grid.frames .choice-thumb img{
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+  transform:none!important;
+}
