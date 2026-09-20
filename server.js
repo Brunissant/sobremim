@@ -13,8 +13,7 @@ const pool = new Pool({
 });
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "").toLowerCase();
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
-const SESSION_SECRET = process.env.SESSION_SECRET || crypto.createHash("sha256").update(ADMIN_PASSWORD || "admin-disabled").digest("hex");
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.createHash("sha256").update(ADMIN_EMAIL || "apolo-admin").digest("hex");
 
 await pool.query(`
   create table if not exists gallery_photos (
@@ -23,7 +22,12 @@ await pool.query(`
     image_data bytea not null,
     created_at timestamptz not null default now(),
     hidden boolean not null default false
-  )
+  );
+  create table if not exists admin_credentials (
+    email text primary key,
+    password_hash text not null,
+    created_at timestamptz not null default now()
+  );
 `);
 
 function cookies(req) {
@@ -52,17 +56,55 @@ function adminOnly(req,res,next) {
   next();
 }
 
-app.get("/api/session",(req,res)=>res.json({admin:isAdmin(req)}));
-
-app.post("/api/login",(req,res)=>{
-  const email = String(req.body?.email || "").trim().toLowerCase();
-  const password = String(req.body?.password || "");
-  if (!ADMIN_EMAIL || !ADMIN_PASSWORD || email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
-    return res.status(401).json({error:"E-mail ou senha incorretos"});
-  }
+function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return salt + ":" + hash;
+}
+function verifyPassword(password, stored) {
+  const [salt, hash] = String(stored || "").split(":");
+  if (!salt || !hash) return false;
+  const candidate = crypto.scryptSync(password, salt, 64);
+  const expected = Buffer.from(hash, "hex");
+  try { return candidate.length === expected.length && crypto.timingSafeEqual(candidate, expected); }
+  catch { return false; }
+}
+async function adminSetupRequired() {
+  if (!ADMIN_EMAIL) return false;
+  const { rows } = await pool.query("select 1 from admin_credentials where email=$1",[ADMIN_EMAIL]);
+  return rows.length === 0;
+}
+function setAdminCookie(res,email) {
   const exp = Date.now() + 12*60*60*1000;
   const token = email + "|" + exp + "|" + sign(email + "|" + exp);
   res.setHeader("Set-Cookie", `apolo_admin=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=43200`);
+}
+
+app.get("/api/session",async(req,res)=>res.json({
+  admin:isAdmin(req),
+  setupRequired: await adminSetupRequired(),
+  adminEmail: ADMIN_EMAIL
+}));
+
+app.post("/api/setup-admin",async(req,res)=>{
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+  if (!ADMIN_EMAIL || email !== ADMIN_EMAIL) return res.status(403).json({error:"Este e-mail não é o administrador configurado"});
+  if (password.length < 8) return res.status(400).json({error:"A senha precisa ter pelo menos 8 caracteres"});
+  if (!(await adminSetupRequired())) return res.status(409).json({error:"O acesso de administradora já foi criado"});
+  await pool.query("insert into admin_credentials(email,password_hash) values($1,$2)",[email,hashPassword(password)]);
+  setAdminCookie(res,email);
+  res.json({ok:true});
+});
+
+app.post("/api/login",async(req,res)=>{
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+  if (!ADMIN_EMAIL || email !== ADMIN_EMAIL) return res.status(401).json({error:"E-mail ou senha incorretos"});
+  const { rows } = await pool.query("select password_hash from admin_credentials where email=$1",[email]);
+  if (!rows[0] || !verifyPassword(password,rows[0].password_hash)) {
+    return res.status(401).json({error:"E-mail ou senha incorretos"});
+  }
+  setAdminCookie(res,email);
   res.json({ok:true});
 });
 
