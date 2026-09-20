@@ -32,7 +32,7 @@ const makeupOptions = {
 const processedFrameCache = new Map();
 
 const state = {
-  step:1, frame:0, filter:0, stream:null, sourceType:null, facing:"user",
+  studioTab:"frames", frame:0, filter:0, stream:null, sourceType:null, facing:"user",
   sources:[], sourceIndex:0, result:null, landmarks:null, landmarker:null, faceReady:false,
   makeup:{lipstick:null,lashes:"none",blush:null,intensity:.60},
   galleryAdmin:false, modalPhoto:null
@@ -43,7 +43,6 @@ const els = {
   video:$("#camera"), source:$("#sourcePhoto"), makeup:$("#makeupPreview"), frame:$("#framePreview"),
   placeholder:$("#cameraPlaceholder"), countdown:$("#countdown"), frameGrid:$("#frameGrid"),
   framePanel:$("#framePanel"), effectsPanel:$("#effectsPanel"), filterGrid:$("#filterGrid"),
-  stepEyebrow:$("#stepEyebrow"), stepTitle:$("#stepTitle"), progress:$$(".progress i"),
   back:$("#backBtn"), next:$("#nextBtn"), error:$("#cameraError"), file:$("#fileInput"),
   cameraInput:$("#cameraInput"), selectedStrip:$("#selectedStrip"), switchCamera:$("#switchCameraBtn"), nativeCamera:$("#nativeCameraBtn"), shutter:$("#shutterBtn"),
   resultImage:$("#resultImage"), publishStatus:$("#publishStatus"), faceStatus:$("#faceStatus"),
@@ -67,25 +66,32 @@ function roundedMaskPath(ctx,x,y,w,h,r){
 async function getOpenFrame(index){
   const src=frames[index][1];
   if(!src) return null;
-  if(![0,2,3].includes(index)) return src;
   if(processedFrameCache.has(index)) return processedFrameCache.get(index);
   const im=await loadImage(src);
   const c=document.createElement("canvas");c.width=1080;c.height=1350;const ctx=c.getContext("2d");
-  const scale=index===0?1.18:1.34;
-  const dw=c.width*scale,dh=c.height*scale;
-  ctx.drawImage(im,(c.width-dw)/2,(c.height-dh)/2,dw,dh);
-  // Abre o centro de verdade: remove a folhagem que invade a área da foto,
-  // mantendo animais/personagens nas laterais e a base decorativa.
-  const cut=index===0
-    ? {x:165,y:125,w:750,h:790,r:110}
-    : {x:185,y:115,w:710,h:900,r:105};
-  ctx.save();
-  ctx.globalCompositeOperation="destination-out";
-  ctx.filter="blur(7px)";
-  ctx.fillStyle="#000";
-  roundedMaskPath(ctx,cut.x,cut.y,cut.w,cut.h,cut.r);
-  ctx.fill();
-  ctx.restore();
+  ctx.drawImage(im,0,0,c.width,c.height);
+
+  // Recortes centrais amplos: preservam personagens e detalhes externos,
+  // mas removem folhagem/ornamentos que invadem o campo da foto.
+  const profiles=[
+    {x:112,y:122,w:856,h:880,r:92}, // animais
+    {x:92,y:90,w:896,h:770,r:84},   // jipe
+    {x:105,y:92,w:870,h:1010,r:88}, // girafa
+    {x:105,y:92,w:870,h:1010,r:88}, // elefante
+    {x:190,y:82,w:805,h:1040,r:90}, // leão esquerda
+    {x:85,y:82,w:805,h:1040,r:90},  // leão direita
+    {x:105,y:88,w:870,h:785,r:88}   // turma
+  ];
+  const cut=profiles[index];
+  if(cut){
+    ctx.save();
+    ctx.globalCompositeOperation="destination-out";
+    ctx.filter="blur(4px)";
+    ctx.fillStyle="#000";
+    roundedMaskPath(ctx,cut.x,cut.y,cut.w,cut.h,cut.r);
+    ctx.fill();
+    ctx.restore();
+  }
   const out=c.toDataURL("image/png");
   processedFrameCache.set(index,out);
   return out;
@@ -128,15 +134,19 @@ function renderMakeup(){
     });
   });
 }
-function updateStep(){
-  els.stepEyebrow.textContent="ETAPA "+state.step+" DE 3";
-  els.stepTitle.textContent=state.step===1?"Escolha sua moldura":"Maquiagem, luz & cor";
-  els.progress.forEach((x,i)=>x.classList.toggle("on",i<state.step));
-  els.framePanel.classList.toggle("hidden",state.step!==1);
-  els.effectsPanel.classList.toggle("hidden",state.step!==2);
-  els.next.textContent=state.step===1?"Continuar →":"FINALIZAR FOTO";
-  els.back.textContent=state.step===1?"← Voltar":"← Molduras";
+function setStudioTab(tab){
+  state.studioTab=tab;
+  $$(".studio-tab").forEach(b=>b.classList.toggle("active",b.dataset.studioTab===tab));
+  els.framePanel.classList.toggle("hidden",tab!=="frames");
+  $("#lightPanel").classList.toggle("hidden",tab!=="filters");
+  $("#makeupPanel").classList.toggle("hidden",tab!=="makeup");
+  els.effectsPanel.classList.toggle("hidden",tab==="frames");
+  // Foto da galeria precisa de um botão para finalizar; na câmera o obturador faz isso.
+  els.next.classList.toggle("hidden",state.sourceType!=="image");
+  els.next.textContent="Finalizar foto";
+  els.back.textContent="← Voltar";
 }
+
 
 function dataURL(file){
   return new Promise((resolve,reject)=>{
@@ -148,7 +158,7 @@ async function chooseFiles(files){
   stopCamera(); els.switchCamera.classList.add("hidden"); els.shutter.classList.add("hidden"); els.nativeCamera.classList.add("hidden");
   state.sources=await Promise.all(valid.map(async f=>({name:f.name||"foto",dataUrl:await dataURL(f)})));
   state.sourceIndex=0; state.sourceType="image"; state.result=null;
-  showScreen("edit"); state.step=1; updateStep(); renderSelectedStrip(); await loadCurrentSource();
+  showScreen("edit"); setStudioTab("frames"); renderSelectedStrip(); await syncFrame(); await loadCurrentSource();
 }
 async function loadCurrentSource(){
   const item=state.sources[state.sourceIndex]; if(!item) return;
@@ -171,7 +181,7 @@ function renderSelectedStrip(){
 }
 
 async function startCamera(){
-  showScreen("edit"); state.step=1; updateStep(); state.sourceType="camera"; state.sources=[]; await syncFrame();
+  showScreen("edit"); state.sourceType="camera"; state.sources=[]; setStudioTab("frames"); await syncFrame();
   els.selectedStrip.classList.add("hidden"); els.source.classList.add("hidden"); els.video.classList.remove("hidden"); els.placeholder.classList.remove("hidden");
   els.placeholder.textContent="Abrindo câmera…"; els.switchCamera.classList.add("hidden"); els.shutter.classList.add("hidden"); els.nativeCamera.classList.add("hidden");
   stopCamera(); els.error.classList.add("hidden");
@@ -261,14 +271,23 @@ function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r)}
 async function drawBranding(ctx,w,h){
   if(!frames[state.frame][1])return;
   const logo=await loadImage("/assets/apolo-lettering.png");
-  const bw=650,bh=82,x=(w-bw)/2,y=24;
+  const x=40,y=38,bw=390,bh=178;
   ctx.save();
-  ctx.fillStyle="rgba(255,250,240,.92)";roundRect(ctx,x,y,bw,bh,41);ctx.fill();
-  ctx.strokeStyle="rgba(129,146,106,.76)";ctx.lineWidth=2;ctx.stroke();
-  ctx.fillStyle="#3f4b3b";ctx.textAlign="left";ctx.font="800 20px Arial";ctx.fillText("SAFARI DO",x+35,y+49);
-  ctx.drawImage(logo,x+154,y+17,145,50);
-  ctx.strokeStyle="rgba(100,113,84,.30)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+340,y+16);ctx.lineTo(x+340,y+66);ctx.stroke();
-  ctx.fillStyle="#3f4b3b";ctx.font="800 20px Arial";ctx.fillText("14 • 11 • 2026",x+374,y+49);
+  ctx.fillStyle="rgba(255,250,240,.68)";
+  roundRect(ctx,x,y,bw,bh,24);ctx.fill();
+  ctx.strokeStyle="rgba(129,146,106,.34)";ctx.lineWidth=1.5;ctx.stroke();
+
+  ctx.fillStyle="#3f4b3b";
+  ctx.textAlign="left";
+  ctx.font="800 24px Arial";
+  ctx.fillText("SAFARI DO",x+28,y+42);
+
+  // lettering em degrau
+  ctx.drawImage(logo,x+78,y+45,190,66);
+
+  // data no terceiro degrau
+  ctx.font="800 21px Arial";
+  ctx.fillText("14 • 11 • 2026",x+145,y+145);
   ctx.restore();
 }
 async function composeMedia(media,landmarks,mirror=false){
@@ -338,7 +357,7 @@ async function publishAllResults(){
 }
 
 function resetBooth(){
-  stopCamera();state.result=null;state.landmarks=null;state.step=1;state.frame=0;state.filter=0;state.sources=[];state.sourceIndex=0;
+  stopCamera();state.result=null;state.landmarks=null;state.studioTab="frames";state.frame=0;state.filter=0;state.sources=[];state.sourceIndex=0;
   state.makeup={lipstick:null,lashes:"none",blush:null,intensity:.60};els.selectedStrip.classList.add("hidden");
   els.publishStatus.textContent="";$("#publishBtn").textContent="🌿 ADICIONAR À GALERIA";els.switchCamera.classList.add("hidden");els.shutter.classList.add("hidden");els.nativeCamera.classList.add("hidden");
   renderFrames();renderFilters();renderMakeup();syncFrame();showScreen("welcome");
@@ -358,15 +377,12 @@ $("#chooseGallery").onclick=()=>{els.file.value="";els.file.click()};
 els.file.onchange=e=>chooseFiles(e.target.files||[]);
 els.cameraInput.onchange=e=>chooseFiles(e.target.files||[]);
 
-els.next.onclick=()=>{if(state.step===1){state.step=2;updateStep()}else capture()};
-els.back.onclick=()=>{if(state.step===1)resetBooth();else{state.step=1;updateStep()}};
+els.next.onclick=()=>capture();
+els.back.onclick=()=>resetBooth();
 
 $("#saveBtn").onclick=saveResult;$("#shareBtn").onclick=shareResult;$("#publishBtn").onclick=publishResult;$("#againBtn").onclick=resetBooth;
 
-$$(".effect-tab").forEach(b=>b.onclick=()=>{
-  $$(".effect-tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");
-  $("#makeupPanel").classList.toggle("hidden",b.dataset.effectTab!=="makeup");$("#lightPanel").classList.toggle("hidden",b.dataset.effectTab!=="light");
-});
+$$(".studio-tab").forEach(b=>b.onclick=()=>setStudioTab(b.dataset.studioTab));
 $$("[data-clear]").forEach(b=>b.onclick=()=>{const k=b.dataset.clear;state.makeup[k]=k==="lashes"?"none":null;renderMakeup();drawPreviewMakeup()});
 $("#noMakeup").onclick=()=>{state.makeup={...state.makeup,lipstick:null,lashes:"none",blush:null};renderMakeup();drawPreviewMakeup()};
 $("#clearAll").onclick=()=>{state.makeup={lipstick:null,lashes:"none",blush:null,intensity:.60};state.filter=0;$("#makeupIntensity").value=60;$("#makeupIntensityLabel").textContent="60%";renderMakeup();renderFilters();setFilterPreview();drawPreviewMakeup()};
@@ -502,5 +518,5 @@ $("#loginBtn").onclick=async()=>{
 };
 $("#logoutBtn").onclick=async()=>{await fetch("/api/logout",{method:"POST"});$("#loginModal").classList.add("hidden");loadGallery()};
 
-renderFrames();renderFilters();renderMakeup();syncFrame();setFilterPreview();updateStep();
+renderFrames();renderFilters();renderMakeup();syncFrame();setFilterPreview();setStudioTab("frames");
 window.addEventListener("resize",drawPreviewMakeup);
