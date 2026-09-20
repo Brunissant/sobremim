@@ -4,6 +4,7 @@ import crypto from "crypto";
 
 const { Pool } = pg;
 const app = express();
+app.set("trust proxy",1);
 app.use(express.json({ limit: "15mb" }));
 app.use(express.static("public"));
 
@@ -140,6 +141,29 @@ app.post("/api/photos",async(req,res)=>{
   const id=crypto.randomUUID();
   await pool.query("insert into gallery_photos(id,mime_type,image_data) values($1,$2,$3)",[id,m[1],buf]);
   res.json({ok:true,id});
+});
+
+app.get("/share/photo/:id",async(req,res)=>{
+  const { rows } = await pool.query("select id,hidden from gallery_photos where id=$1",[req.params.id]);
+  if(!rows[0] || rows[0].hidden) return res.sendStatus(404);
+  const origin = req.protocol + "://" + req.get("host");
+  const image = origin + "/api/photos/" + req.params.id + "/image";
+  const page = origin + "/share/photo/" + req.params.id;
+  res.setHeader("Content-Type","text/html; charset=utf-8");
+  res.send(`<!doctype html><html lang="pt-BR"><head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Safari do Apolo — Memória da Festa</title>
+    <meta property="og:title" content="Safari do Apolo — Memória da Festa">
+    <meta property="og:description" content="Uma lembrança da primeira volta ao sol do Apolo.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="${page}">
+    <meta property="og:image" content="${image}">
+    <meta property="og:image:secure_url" content="${image}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Safari do Apolo — Memória da Festa">
+    <meta name="twitter:image" content="${image}">
+    <meta http-equiv="refresh" content="0;url=/">
+  </head><body></body></html>`);
 });
 
 app.patch("/api/photos/:id",adminOnly,async(req,res)=>{
