@@ -12,125 +12,77 @@ const frames = [
   ["Sem moldura",null]
 ];
 
-const frameTuning = [
-  {scale:.975,y:0},  // Animais na folhagem
-  {scale:.955,y:2},  // Macaco e Apolo no jipe
-  {scale:.970,y:0},  // Girafa na folhagem
-  {scale:.970,y:0},  // Elefante botânico
-  {scale:.970,y:0},  // Leão à esquerda
-  {scale:.970,y:0},  // Leão à direita
-  {scale:.955,y:2},  // Turma com Apolo
-  {scale:1,y:0}
-];
-
-const filters = [
-  ["Natural","none"],
-  ["Iluminado","brightness(1.12) contrast(.96) saturate(1.03)"],
-  ["Luz quente","sepia(.11) saturate(1.08) brightness(1.05)"],
-  ["Rosé","sepia(.10) saturate(.92) hue-rotate(330deg) brightness(1.04)"],
-  ["Bronze","sepia(.26) saturate(1.12) contrast(1.02)"],
-  ["Festa","saturate(1.34) contrast(1.06) brightness(1.03)"],
-  ["Vintage suave","sepia(.17) saturate(.82) contrast(.96)"],
-  ["Verde safari","sepia(.06) hue-rotate(48deg) saturate(.88) brightness(1.02)"]
-];
-
-const makeupOptions = {
-  lipstick:[["Natural",null],["Nude","#a56f63"],["Rosé","#b85f70"],["Vermelho suave","#b74d50"],["Vinho suave","#873e50"]],
-  lashes:[["Nenhum","none"],["Natural","natural"],["Alongado","long"],["Festa","party"]],
-  blush:[["Nenhum",null],["Rosado","#d97983"],["Pêssego","#df8c74"],["Bronze","#b67859"]]
-};
-
-const processedFrameCache = new Map();
-
 const state = {
-  studioTab:"frames", frame:0, filter:0, stream:null, sourceType:null, facing:"user",
-  sources:[], sourceIndex:0, result:null, landmarks:null, landmarker:null, faceReady:false,
-  makeup:{lipstick:null,lashes:"none",blush:null,intensity:.60},
-  galleryAdmin:false, modalPhoto:null
+  frame:0,
+  stream:null,
+  facing:"user",
+  sourceType:null,
+  sources:[],
+  sourceIndex:0,
+  result:null,
+  galleryAdmin:false,
+  modalPhoto:null
 };
 
 const els = {
-  welcome:$("#welcomeScreen"), edit:$("#editScreen"), result:$("#resultScreen"),
-  video:$("#camera"), source:$("#sourcePhoto"), makeup:$("#makeupPreview"), frame:$("#framePreview"),
-  placeholder:$("#cameraPlaceholder"), countdown:$("#countdown"), frameGrid:$("#frameGrid"),
-  framePanel:$("#framePanel"), effectsPanel:$("#effectsPanel"), filterGrid:$("#filterGrid"),
-  back:$("#backBtn"), next:$("#nextBtn"), error:$("#cameraError"), file:$("#fileInput"),
-  cameraInput:$("#cameraInput"), selectedStrip:$("#selectedStrip"), switchCamera:$("#switchCameraBtn"), nativeCamera:$("#nativeCameraBtn"), shutter:$("#shutterBtn"),
-  resultImage:$("#resultImage"), publishStatus:$("#publishStatus"), faceStatus:$("#faceStatus"),
-  galleryGrid:$("#galleryGrid"), galleryEmpty:$("#galleryEmpty"), branding:$(".frame-branding")
+  cameraTab:$("#cameraTab"),
+  galleryTab:$("#galleryTab"),
+  cameraSection:$("#cameraSection"),
+  gallerySection:$("#gallerySection"),
+  galleryCount:$("#galleryCount"),
+  stage:$("#photoStage"),
+  video:$("#camera"),
+  sourcePhoto:$("#sourcePhoto"),
+  frame:$("#framePreview"),
+  branding:$(".frame-branding"),
+  placeholder:$("#cameraPlaceholder"),
+  startCamera:$("#startCamera"),
+  switchCamera:$("#switchCameraBtn"),
+  shutter:$("#shutterBtn"),
+  countdown:$("#countdown"),
+  fileInput:$("#fileInput"),
+  cameraInput:$("#cameraInput"),
+  chooseGallery:$("#chooseGallery"),
+  nativeCamera:$("#nativeCameraBtn"),
+  error:$("#cameraError"),
+  frameGrid:$("#frameGrid"),
+  selectedStrip:$("#selectedStrip"),
+  resultSection:$("#resultSection"),
+  resultImage:$("#resultImage"),
+  saveBtn:$("#saveBtn"),
+  shareBtn:$("#shareBtn"),
+  publishBtn:$("#publishBtn"),
+  againBtn:$("#againBtn"),
+  publishStatus:$("#publishStatus"),
+  galleryGrid:$("#galleryGrid"),
+  galleryEmpty:$("#galleryEmpty")
 };
 
-function showScreen(name){
-  [els.welcome,els.edit,els.result].forEach(x=>x.classList.add("hidden"));
-  els[name].classList.remove("hidden");
-  document.body.classList.toggle("studio-mode",name==="edit");
+function stopCamera(){
+  state.stream?.getTracks().forEach(t=>t.stop());
+  state.stream=null;
 }
-function stopCamera(){ state.stream?.getTracks().forEach(t=>t.stop()); state.stream=null; }
-function isMobile(){ return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || matchMedia("(pointer:coarse)").matches; }
 
-function setFilterPreview(){
-  const f=filters[state.filter][1]; els.video.style.filter=f; els.source.style.filter=f;
-}
-function roundedMaskPath(ctx,x,y,w,h,r){
-  ctx.beginPath();
-  ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
-}
-async function getOpenFrame(index){
-  const src=frames[index][1];
-  if(!src)return null;
-  if(processedFrameCache.has(index))return processedFrameCache.get(index);
-
-  const im=await loadImage(src);
-  const scan=document.createElement("canvas");
-  scan.width=im.naturalWidth||im.width;
-  scan.height=im.naturalHeight||im.height;
-  const sctx=scan.getContext("2d",{willReadFrequently:true});
-  sctx.drawImage(im,0,0,scan.width,scan.height);
-
-  let minX=scan.width,minY=scan.height,maxX=-1,maxY=-1;
-  try{
-    const data=sctx.getImageData(0,0,scan.width,scan.height).data;
-    for(let y=0;y<scan.height;y++){
-      for(let x=0;x<scan.width;x++){
-        if(data[(y*scan.width+x)*4+3]>8){
-          if(x<minX)minX=x;if(x>maxX)maxX=x;
-          if(y<minY)minY=y;if(y>maxY)maxY=y;
-        }
-      }
-    }
-  }catch(e){
-    console.warn("Não foi possível analisar transparência da moldura",e);
+function showSection(which){
+  const camera=which==="camera";
+  els.cameraSection.classList.toggle("active",camera);
+  els.gallerySection.classList.toggle("active",!camera);
+  els.cameraTab.classList.toggle("active",camera);
+  els.galleryTab.classList.toggle("active",!camera);
+  if(!camera){
+    stopCamera();
+    loadGallery();
   }
-
-  if(maxX<minX||maxY<minY){
-    processedFrameCache.set(index,src);
-    return src;
-  }
-
-  // Pequena margem de segurança para nunca cortar personagens/folhas.
-  const padX=Math.max(2,Math.round((maxX-minX)*.006));
-  const padY=Math.max(2,Math.round((maxY-minY)*.006));
-  minX=Math.max(0,minX-padX); minY=Math.max(0,minY-padY);
-  maxX=Math.min(scan.width-1,maxX+padX); maxY=Math.min(scan.height-1,maxY+padY);
-
-  const sw=maxX-minX+1, sh=maxY-minY+1;
-  const out=document.createElement("canvas");
-  out.width=1080;out.height=1350;
-  const octx=out.getContext("2d");
-
-  // O recorte remove somente margem transparente. O conteúdo inteiro é mantido.
-  octx.drawImage(im,minX,minY,sw,sh,0,0,out.width,out.height);
-
-  const url=out.toDataURL("image/png");
-  processedFrameCache.set(index,url);
-  return url;
 }
-async function syncFrame(){
-  const src=await getOpenFrame(state.frame);
-  els.frame.classList.remove("frame-open");
+
+els.cameraTab.onclick=()=>showSection("camera");
+els.galleryTab.onclick=()=>showSection("gallery");
+$("#brandHome").onclick=()=>showSection("camera");
+
+function syncFrame(){
+  const src=frames[state.frame][1];
   if(src){
     els.frame.src=src;
-    els.frame.style.setProperty("--frame-transform","none");
     els.frame.classList.remove("hidden");
     els.branding.classList.remove("hidden");
   }else{
@@ -138,432 +90,446 @@ async function syncFrame(){
     els.branding.classList.add("hidden");
   }
 }
+
 function renderFrames(){
   els.frameGrid.innerHTML="";
   frames.forEach(([name,src],i)=>{
-    const b=document.createElement("button");b.className="choice-card"+(state.frame===i?" selected":"");
-    if(src){
-      b.innerHTML='<span class="choice-thumb"><img src="'+src+'" alt=""></span><span>'+name+'</span>';
-      const img=b.querySelector("img");getOpenFrame(i).then(u=>{if(u)img.src=u});
-    }else{
-      b.innerHTML='<span class="choice-thumb none">＋</span><span>'+name+'</span>';
-    }
-    b.onclick=async()=>{state.frame=i;await syncFrame();renderFrames()};
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="frame-card"+(i===state.frame?" selected":"");
+    b.innerHTML=src
+      ? '<span class="frame-thumb"><img src="'+src+'" alt=""></span><span>'+name+'</span>'
+      : '<span class="frame-thumb none">＋</span><span>Sem moldura</span>';
+    b.onclick=()=>{
+      state.frame=i;
+      syncFrame();
+      renderFrames();
+    };
     els.frameGrid.appendChild(b);
   });
 }
-function renderFilters(){
-  els.filterGrid.innerHTML="";
-  filters.forEach(([name,filter],i)=>{
-    const b=document.createElement("button"); b.className="choice-card"+(state.filter===i?" selected":"");
-    b.innerHTML='<span class="filter-preview"><img src="/assets/apolo-rosto-centralizado.png" alt="" style="filter:'+filter+'"></span><span>'+name+'</span>';
-    b.onclick=()=>{state.filter=i;setFilterPreview();renderFilters()};
-    els.filterGrid.appendChild(b);
-  });
+
+function showPlaceholder(){
+  els.placeholder.classList.remove("hidden");
+  els.video.classList.add("hidden");
+  els.sourcePhoto.classList.add("hidden");
+  els.switchCamera.classList.add("hidden");
+  els.shutter.classList.add("hidden");
 }
-function renderMakeup(){
-  Object.entries(makeupOptions).forEach(([key,items])=>{
-    const box=document.querySelector('[data-options="'+key+'"]'); box.innerHTML="";
-    items.forEach(([label,value])=>{
-      const b=document.createElement("button"); b.className="chip"+(state.makeup[key]===value?" active":""); b.textContent=label;
-      b.onclick=()=>{state.makeup[key]=value;renderMakeup();drawPreviewMakeup()}; box.appendChild(b);
+
+async function startCamera(){
+  stopCamera();
+  state.sourceType="camera";
+  state.sources=[];
+  els.selectedStrip.classList.add("hidden");
+  els.error.classList.add("hidden");
+  els.nativeCamera.classList.add("hidden");
+  els.placeholder.classList.remove("hidden");
+  els.video.classList.remove("hidden");
+  els.sourcePhoto.classList.add("hidden");
+
+  try{
+    if(!navigator.mediaDevices?.getUserMedia) throw new Error("Câmera indisponível");
+    const stream=await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:{ideal:state.facing},
+        width:{ideal:1280},
+        height:{ideal:1600}
+      },
+      audio:false
     });
-  });
-}
-function setStudioTab(){
-  state.studioTab="frames";
-  els.framePanel.classList.remove("hidden");
-  els.effectsPanel.classList.add("hidden");
-  els.next.classList.toggle("hidden",state.sourceType!=="image");
-  els.next.textContent="Finalizar foto";
-  els.back.textContent="← Voltar";
+    state.stream=stream;
+    els.video.srcObject=stream;
+    await els.video.play();
+    els.video.classList.toggle("mirror",state.facing==="user");
+    els.placeholder.classList.add("hidden");
+    els.switchCamera.classList.remove("hidden");
+    els.shutter.classList.remove("hidden");
+  }catch(e){
+    console.warn(e);
+    els.video.classList.add("hidden");
+    els.placeholder.classList.remove("hidden");
+    els.error.textContent="Não consegui abrir a câmera dentro do site. Confira a permissão da câmera ou use a câmera do celular.";
+    els.error.classList.remove("hidden");
+    els.nativeCamera.classList.remove("hidden");
+  }
 }
 
+els.startCamera.onclick=startCamera;
+els.switchCamera.onclick=async()=>{
+  state.facing=state.facing==="user"?"environment":"user";
+  await startCamera();
+};
+els.nativeCamera.onclick=()=>{
+  els.cameraInput.value="";
+  els.cameraInput.click();
+};
+els.chooseGallery.onclick=()=>{
+  els.fileInput.value="";
+  els.fileInput.click();
+};
 
-function dataURL(file){
+function fileToDataURL(file){
   return new Promise((resolve,reject)=>{
-    const r=new FileReader(); r.onload=()=>resolve(String(r.result)); r.onerror=reject; r.readAsDataURL(file);
+    const r=new FileReader();
+    r.onload=()=>resolve(String(r.result));
+    r.onerror=reject;
+    r.readAsDataURL(file);
   });
 }
-async function chooseFiles(files){
-  const valid=[...files].filter(f=>f.type.startsWith("image/")); if(!valid.length) return;
-  stopCamera(); els.switchCamera.classList.add("hidden"); els.shutter.classList.add("hidden"); els.nativeCamera.classList.add("hidden");
-  state.sources=await Promise.all(valid.map(async f=>({name:f.name||"foto",dataUrl:await dataURL(f)})));
-  state.sourceIndex=0; state.sourceType="image"; state.result=null;
-  showScreen("edit"); setStudioTab("frames"); renderSelectedStrip(); await syncFrame(); await loadCurrentSource();
+
+async function chooseFiles(fileList){
+  const files=[...fileList].filter(f=>f.type.startsWith("image/"));
+  if(!files.length)return;
+  stopCamera();
+  state.sources=await Promise.all(files.map(async file=>({
+    name:file.name||"foto",
+    dataUrl:await fileToDataURL(file)
+  })));
+  state.sourceIndex=0;
+  state.sourceType="image";
+  renderSelectedStrip();
+  loadCurrentSource();
 }
-async function loadCurrentSource(){
-  const item=state.sources[state.sourceIndex]; if(!item) return;
-  els.source.onload=()=>{
-    els.source.classList.remove("hidden"); els.video.classList.add("hidden"); els.placeholder.classList.add("hidden");
-    els.makeup.classList.add("hidden");
-  };
-  els.source.src=item.dataUrl;
-}
+
 function renderSelectedStrip(){
   const many=state.sources.length>1;
-  els.selectedStrip.classList.toggle("hidden",!many); els.selectedStrip.innerHTML="";
-  if(!many) return;
+  els.selectedStrip.classList.toggle("hidden",!many);
+  els.selectedStrip.innerHTML="";
+  if(!many)return;
   state.sources.forEach((s,i)=>{
-    const b=document.createElement("button"); b.className="selected-thumb"+(i===state.sourceIndex?" active":"");
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="selected-thumb"+(i===state.sourceIndex?" active":"");
     b.innerHTML='<img src="'+s.dataUrl+'" alt="Foto '+(i+1)+'">';
-    b.onclick=async()=>{state.sourceIndex=i;renderSelectedStrip();await loadCurrentSource()};
+    b.onclick=()=>{
+      state.sourceIndex=i;
+      renderSelectedStrip();
+      loadCurrentSource();
+    };
     els.selectedStrip.appendChild(b);
   });
 }
 
-async function startCamera(){
-  showScreen("edit"); state.sourceType="camera"; state.sources=[]; setStudioTab("frames"); await syncFrame();
-  els.selectedStrip.classList.add("hidden"); els.source.classList.add("hidden"); els.video.classList.remove("hidden"); els.placeholder.classList.remove("hidden");
-  els.placeholder.textContent="Abrindo câmera…"; els.switchCamera.classList.add("hidden"); els.shutter.classList.add("hidden"); els.nativeCamera.classList.add("hidden");
-  stopCamera(); els.error.classList.add("hidden");
-  if(!navigator.mediaDevices?.getUserMedia){
-    els.error.textContent="Este navegador não liberou a câmera dentro do site.";
-    els.error.classList.remove("hidden"); els.nativeCamera.classList.remove("hidden"); els.placeholder.textContent="Câmera indisponível";
-    return;
-  }
-  try{
-    state.stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{ideal:state.facing},width:{ideal:1280},height:{ideal:1600}},audio:false
-    });
-    els.video.srcObject=state.stream; await els.video.play(); els.placeholder.classList.add("hidden");
-    els.switchCamera.classList.remove("hidden"); els.shutter.classList.remove("hidden"); els.nativeCamera.classList.add("hidden");
-    els.video.classList.toggle("mirror",state.facing==="user");
-    els.makeup.classList.add("hidden");
-  }catch(e){
-    console.warn(e);
-    els.error.textContent="Não conseguimos abrir a câmera dentro do site. Verifique a permissão da câmera no navegador ou use a câmera do celular.";
-    els.error.classList.remove("hidden"); els.nativeCamera.classList.remove("hidden"); els.shutter.classList.add("hidden"); els.placeholder.textContent="Câmera bloqueada";
-  }
-}
-
-let mpModule=null;
-async function ensureFaceLandmarker(mode){
-  try{
-    if(!mpModule) mpModule=await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm");
-    if(!state.landmarker){
-      const vision=await mpModule.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm");
-      const base={modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"};
-      try{
-        state.landmarker=await mpModule.FaceLandmarker.createFromOptions(vision,{
-          baseOptions:{...base,delegate:"GPU"},runningMode:mode,numFaces:1,outputFaceBlendshapes:false
-        });
-      }catch(gpuError){
-        console.warn("FaceLandmarker GPU indisponível; usando CPU",gpuError);
-        state.landmarker=await mpModule.FaceLandmarker.createFromOptions(vision,{
-          baseOptions:{...base,delegate:"CPU"},runningMode:mode,numFaces:1,outputFaceBlendshapes:false
-        });
-      }
-    }else await state.landmarker.setOptions({runningMode:mode});
-    state.faceReady=true; els.faceStatus.textContent="Maquiagem facial pronta — os efeitos acompanham o rosto.";
-  }catch(e){
-    console.warn(e); state.faceReady=false; els.faceStatus.textContent="Não foi possível ativar maquiagem facial neste aparelho. Filtros de luz continuam disponíveis.";
-  }
-}
-async function detectImageFaceFor(image){
-  await ensureFaceLandmarker("IMAGE"); if(!state.faceReady) return null;
-  try{return state.landmarker.detect(image).faceLandmarks?.[0]||null}catch(e){return null}
-}
-async function detectImageFace(){ state.landmarks=await detectImageFaceFor(els.source); }
-let lastVideoTime=-1;
-function faceLoop(){
-  if(state.sourceType!=="camera"||!state.stream)return;
-  if(state.faceReady&&els.video.readyState>=2&&els.video.currentTime!==lastVideoTime){
-    lastVideoTime=els.video.currentTime;
-    try{state.landmarks=state.landmarker.detectForVideo(els.video,performance.now()).faceLandmarks?.[0]||null;drawPreviewMakeup()}catch(e){}
-  }
-  requestAnimationFrame(faceLoop);
-}
-
-const lipOuter=[61,146,91,181,84,17,314,405,321,375,291];
-const leftUpper=[33,160,158,133],rightUpper=[362,385,387,263];
-function makeFaceMapper(lm,w,h,srcW,srcH,mirror=false){
-  const scale=Math.max(w/srcW,h/srcH);
-  const dw=srcW*scale,dh=srcH*scale;
-  const ox=(w-dw)/2,oy=(h-dh)/2;
-  return (i)=>{
-    const p=lm[i];
-    const sx=(mirror?1-p.x:p.x)*srcW;
-    const sy=p.y*srcH;
-    return [ox+sx*scale,oy+sy*scale];
+function loadCurrentSource(){
+  const item=state.sources[state.sourceIndex];
+  if(!item)return;
+  els.sourcePhoto.onload=()=>{
+    els.sourcePhoto.classList.remove("hidden");
+    els.video.classList.add("hidden");
+    els.placeholder.classList.add("hidden");
+    els.switchCamera.classList.add("hidden");
+    els.shutter.classList.remove("hidden");
+    els.error.classList.add("hidden");
   };
-}
-function drawMakeup(ctx,lm,w,h,srcW=w,srcH=h,mirror=false){
-  if(!lm||!srcW||!srcH)return;
-  const map=makeFaceMapper(lm,w,h,srcW,srcH,mirror);
-  const a=state.makeup.intensity;
-  if(state.makeup.blush){
-    ctx.save();ctx.globalAlpha=.22*a;
-    for(const idx of [117,346]){
-      const[x,y]=map(idx),r=Math.max(18,w*.065);
-      const g=ctx.createRadialGradient(x,y,0,x,y,r);
-      g.addColorStop(0,state.makeup.blush);g.addColorStop(1,"transparent");
-      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
-    }ctx.restore();
-  }
-  if(state.makeup.lipstick){
-    ctx.save();ctx.globalAlpha=.46*a;ctx.fillStyle=state.makeup.lipstick;ctx.beginPath();
-    lipOuter.forEach((idx,j)=>{const[x,y]=map(idx);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});
-    ctx.closePath();ctx.fill();ctx.restore();
-  }
-  if(state.makeup.lashes!=="none"){
-    const amount=state.makeup.lashes==="party"?7:state.makeup.lashes==="long"?5:3;
-    const len=(state.makeup.lashes==="party"?18:state.makeup.lashes==="long"?14:10)*(w/430)*a;
-    ctx.save();ctx.strokeStyle="#3f342f";ctx.lineWidth=Math.max(1.2,w/430*1.4);ctx.lineCap="round";ctx.globalAlpha=.7+.2*a;
-    for(const arr of [leftUpper,rightUpper]){
-      const p1=map(arr[0]),p2=map(arr[arr.length-1]);
-      for(let i=0;i<amount;i++){
-        const t=(i+1)/(amount+1);
-        const x=p1[0]+(p2[0]-p1[0])*t,y=p1[1]+(p2[1]-p1[1])*t;
-        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+(t-.5)*len*.35,y-len);ctx.stroke();
-      }
-    }ctx.restore();
-  }
-}
-function drawPreviewMakeup(){
-  const c=els.makeup,box=$("#photoStage").getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);
-  c.width=Math.max(1,Math.round(box.width*dpr));c.height=Math.max(1,Math.round(box.height*dpr));
-  c.style.width=box.width+"px";c.style.height=box.height+"px";
-  const ctx=c.getContext("2d");ctx.scale(dpr,dpr);
-  const media=state.sourceType==="camera"?els.video:els.source;
-  const sw=media?.videoWidth||media?.naturalWidth||box.width;
-  const sh=media?.videoHeight||media?.naturalHeight||box.height;
-  drawMakeup(ctx,state.landmarks,box.width,box.height,sw,sh,false);
+  els.sourcePhoto.src=item.dataUrl;
 }
 
+els.fileInput.onchange=e=>chooseFiles(e.target.files||[]);
+els.cameraInput.onchange=e=>chooseFiles(e.target.files||[]);
 
 function drawCover(ctx,media,w,h,mirror=false){
-  const sw=media.videoWidth||media.naturalWidth,sh=media.videoHeight||media.naturalHeight,scale=Math.max(w/sw,h/sh),dw=sw*scale,dh=sh*scale;
-  ctx.save();if(mirror){ctx.translate(w,0);ctx.scale(-1,1)}ctx.drawImage(media,(w-dw)/2,(h-dh)/2,dw,dh);ctx.restore();
+  const sw=media.videoWidth||media.naturalWidth;
+  const sh=media.videoHeight||media.naturalHeight;
+  const scale=Math.max(w/sw,h/sh);
+  const dw=sw*scale,dh=sh*scale;
+  ctx.save();
+  if(mirror){ctx.translate(w,0);ctx.scale(-1,1)}
+  ctx.drawImage(media,(w-dw)/2,(h-dh)/2,dw,dh);
+  ctx.restore();
 }
-async function loadImage(src){const im=new Image();im.src=src;await im.decode();return im}
-function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r)}
-async function drawBranding(ctx,w,h){
+
+async function loadImage(src){
+  const im=new Image();
+  im.src=src;
+  await im.decode();
+  return im;
+}
+
+async function drawBranding(ctx,w){
   if(!frames[state.frame][1])return;
   const logo=await loadImage("/assets/apolo-lettering.png");
-
-  const bw=330,bh=178;
-  const x=(w-bw)/2,y=28;
+  const y=36;
 
   ctx.save();
-
-  // fundo leve, sem aparência de cartão pesado
-  const grad=ctx.createLinearGradient(x,y,x+bw,y+bh);
-  grad.addColorStop(0,"rgba(247,247,238,.54)");
-  grad.addColorStop(1,"rgba(225,232,214,.38)");
-  ctx.fillStyle=grad;
-  ctx.shadowColor="rgba(50,42,36,.14)";
-  ctx.shadowBlur=10;
-  ctx.shadowOffsetY=3;
-  roundRect(ctx,x,y,bw,bh,14);
-  ctx.fill();
-
   ctx.textAlign="center";
 
-  // SAFÁRI DO
-  ctx.fillStyle="#73554d";
-  ctx.font="800 24px Georgia";
+  ctx.fillStyle="#77564c";
+  ctx.font="800 25px Georgia";
+  ctx.shadowColor="rgba(255,255,255,.95)";
+  ctx.shadowBlur=2;
+  ctx.shadowOffsetX=-1;
+  ctx.shadowOffsetY=-1;
+  ctx.fillText("SAFÁRI DO",w/2,y+28);
+
+  ctx.shadowColor="rgba(65,79,42,.25)";
+  ctx.shadowBlur=3;
+  ctx.shadowOffsetX=1;
+  ctx.shadowOffsetY=2;
+  ctx.drawImage(logo,w/2-118,y+34,236,88);
+
+  ctx.fillStyle="#77564c";
+  ctx.font="800 22px Georgia";
   ctx.shadowColor="rgba(255,255,255,.92)";
   ctx.shadowBlur=2;
   ctx.shadowOffsetX=-1;
   ctx.shadowOffsetY=-1;
-  ctx.fillText("SAFÁRI DO",w/2,y+38);
-
-  // Apolo
-  ctx.shadowColor="rgba(67,82,38,.20)";
-  ctx.shadowBlur=3;
-  ctx.shadowOffsetX=1;
-  ctx.shadowOffsetY=2;
-  ctx.drawImage(logo,w/2-105,y+42,210,78);
-
-  // data
-  ctx.fillStyle="#73554d";
-  ctx.font="800 22px Georgia";
-  ctx.shadowColor="rgba(255,255,255,.90)";
-  ctx.shadowBlur=2;
-  ctx.shadowOffsetX=-1;
-  ctx.shadowOffsetY=-1;
-  ctx.fillText("14 • 11 • 2026",w/2,y+151);
-
+  ctx.fillText("14 • 11 • 2026",w/2,y+145);
   ctx.restore();
 }
-async function composeMedia(media,_landmarks,mirror=false){
-  const w=1080,h=1350,c=document.createElement("canvas");c.width=w;c.height=h;const ctx=c.getContext("2d");
-  ctx.filter="none";
+
+async function composeMedia(media,mirror=false){
+  const w=1122,h=1402;
+  const canvas=document.createElement("canvas");
+  canvas.width=w;canvas.height=h;
+  const ctx=canvas.getContext("2d");
   drawCover(ctx,media,w,h,mirror);
-  const f=await getOpenFrame(state.frame);
-  if(f){
-    const im=await loadImage(f);
-    ctx.drawImage(im,0,0,w,h);
-    await drawBranding(ctx,w,h);
+  const frameSrc=frames[state.frame][1];
+  if(frameSrc){
+    const frame=await loadImage(frameSrc);
+    ctx.drawImage(frame,0,0,w,h);
+    await drawBranding(ctx,w);
   }
-  return c.toDataURL("image/jpeg",.92);
+  return canvas.toDataURL("image/jpeg",.92);
 }
+
 async function composeCurrent(){
-  if(state.sourceType==="camera")return composeMedia(els.video,state.landmarks,state.facing==="user");
-  return composeMedia(els.source,state.landmarks,false);
-}
-async function composeSource(dataUrl){
-  const im=await loadImage(dataUrl);return composeMedia(im,null,false);
+  if(state.sourceType==="camera"){
+    if(!els.video.videoWidth)throw new Error("A câmera ainda está iniciando");
+    return composeMedia(els.video,state.facing==="user");
+  }
+  if(state.sourceType==="image") return composeMedia(els.sourcePhoto,false);
+  throw new Error("Abra a câmera ou escolha uma foto primeiro");
 }
 
 async function capture(){
-  els.next.disabled=true;
-  if(state.sourceType==="camera"){
-    for(const n of [3,2,1]){els.countdown.textContent=n;els.countdown.classList.remove("hidden");await new Promise(r=>setTimeout(r,650))}
-    els.countdown.classList.add("hidden");
+  try{
+    if(state.sourceType==="camera"){
+      for(const n of [3,2,1]){
+        els.countdown.textContent=n;
+        els.countdown.classList.remove("hidden");
+        await new Promise(r=>setTimeout(r,520));
+      }
+      els.countdown.classList.add("hidden");
+    }
+    state.result=await composeCurrent();
+    stopCamera();
+    els.resultImage.src=state.result;
+    els.resultSection.classList.remove("hidden");
+    els.resultSection.scrollIntoView({behavior:"smooth",block:"start"});
+    prepareBatchButtons();
+  }catch(e){
+    els.error.textContent=e.message||"Não foi possível criar a foto.";
+    els.error.classList.remove("hidden");
   }
-  state.result=await composeCurrent();stopCamera();els.resultImage.src=state.result;showScreen("result");prepareBatchButtons();els.next.disabled=false;
 }
+els.shutter.onclick=capture;
+
+async function saveDataUrl(dataUrl,name="safari-do-apolo.jpg"){
+  const a=document.createElement("a");
+  a.href=dataUrl;a.download=name;a.click();
+}
+els.saveBtn.onclick=()=>state.result&&saveDataUrl(state.result);
+
+async function nativeShareDataUrl(dataUrl){
+  const blob=await (await fetch(dataUrl)).blob();
+  const file=new File([blob],"safari-do-apolo.jpg",{type:"image/jpeg"});
+  if(navigator.share&&navigator.canShare?.({files:[file]})){
+    await navigator.share({
+      files:[file],
+      title:"Safari do Apolo",
+      text:"Uma lembrança da primeira volta ao sol do Apolo!"
+    });
+    return true;
+  }
+  return false;
+}
+els.shareBtn.onclick=async()=>{
+  if(!state.result)return;
+  const ok=await nativeShareDataUrl(state.result);
+  if(!ok)saveDataUrl(state.result);
+};
+
+async function postPhoto(dataUrl){
+  const r=await fetch("/api/photos",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({dataUrl})
+  });
+  const j=await r.json();
+  if(!r.ok)throw new Error(j.error||"Erro ao publicar");
+  return j;
+}
+
+els.publishBtn.onclick=async()=>{
+  if(!state.result)return;
+  els.publishBtn.disabled=true;
+  els.publishStatus.textContent="Publicando…";
+  try{
+    await postPhoto(state.result);
+    els.publishStatus.textContent="Sua lembrança foi adicionada à galeria! 🌿";
+    updateGalleryCount();
+  }catch(e){
+    els.publishStatus.textContent=e.message||"Não foi possível publicar.";
+  }finally{
+    els.publishBtn.disabled=false;
+  }
+};
+
+els.againBtn.onclick=()=>{
+  state.result=null;
+  els.resultSection.classList.add("hidden");
+  els.publishStatus.textContent="";
+  showPlaceholder();
+  window.scrollTo({top:0,behavior:"smooth"});
+};
 
 function prepareBatchButtons(){
   $$(".batch-action").forEach(x=>x.remove());
   if(state.sources.length<=1)return;
-  const saveAll=document.createElement("button");saveAll.className="secondary batch-action";saveAll.textContent="⬇️ SALVAR TODAS";
-  saveAll.onclick=saveAllResults;
-  const publishAll=document.createElement("button");publishAll.className="secondary gallery-add batch-action";publishAll.textContent="🌿 ADICIONAR TODAS À GALERIA";
-  publishAll.onclick=publishAllResults;
-  $("#shareBtn").after(saveAll);$("#publishBtn").after(publishAll);
+
+  const saveAll=document.createElement("button");
+  saveAll.className="soft-action batch-action";
+  saveAll.textContent="Salvar todas";
+  saveAll.onclick=saveAllSelected;
+
+  const publishAll=document.createElement("button");
+  publishAll.className="soft-action batch-action";
+  publishAll.textContent="Adicionar todas à galeria";
+  publishAll.onclick=publishAllSelected;
+
+  els.resultSection.querySelector(".result-actions").append(saveAll,publishAll);
 }
-async function saveResult(){const a=document.createElement("a");a.href=state.result;a.download="safari-do-apolo.jpg";a.click()}
-async function saveAllResults(){
-  const btn=[...$$(".batch-action")].find(b=>b.textContent.includes("SALVAR TODAS"));if(btn){btn.disabled=true;btn.textContent="Preparando…"}
+
+async function composeSource(dataUrl){
+  const im=await loadImage(dataUrl);
+  return composeMedia(im,false);
+}
+
+async function saveAllSelected(){
   try{
-    const {default:JSZip}=await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm");const zip=new JSZip();
-    for(let i=0;i<state.sources.length;i++){const out=await composeSource(state.sources[i].dataUrl);zip.file("safari-apolo-"+String(i+1).padStart(2,"0")+".jpg",out.split(",")[1],{base64:true})}
-    const blob=await zip.generateAsync({type:"blob"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="fotos-safari-do-apolo.zip";a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
-  }finally{if(btn){btn.disabled=false;btn.textContent="⬇️ SALVAR TODAS"}}
+    const {default:JSZip}=await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm");
+    const zip=new JSZip();
+    for(let i=0;i<state.sources.length;i++){
+      const out=await composeSource(state.sources[i].dataUrl);
+      zip.file("safari-apolo-"+String(i+1).padStart(2,"0")+".jpg",out.split(",")[1],{base64:true});
+    }
+    const blob=await zip.generateAsync({type:"blob"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download="fotos-safari-do-apolo.zip";a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }catch(e){console.warn(e)}
 }
-async function shareResult(){
-  const blob=await(await fetch(state.result)).blob(),file=new File([blob],"safari-do-apolo.jpg",{type:"image/jpeg"});
-  if(navigator.share&&navigator.canShare?.({files:[file]}))await navigator.share({files:[file],title:"Safari do Apolo"});else saveResult();
-}
-async function postPhoto(dataUrl){const r=await fetch("/api/photos",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dataUrl})});const j=await r.json();if(!r.ok)throw new Error(j.error||"Erro");return j}
-async function publishResult(){
-  const b=$("#publishBtn");b.disabled=true;els.publishStatus.textContent="Publicando sua lembrança…";
-  try{await postPhoto(state.result);els.publishStatus.textContent="Sua lembrança foi adicionada à galeria! 🌿";b.textContent="✓ PUBLICADA NA GALERIA"}
-  catch(e){els.publishStatus.textContent="Não foi possível publicar agora. Tente novamente."}finally{b.disabled=false}
-}
-async function publishAllResults(){
-  const btn=[...$$(".batch-action")].find(b=>b.textContent.includes("ADICIONAR TODAS"));if(btn){btn.disabled=true;btn.textContent="Publicando…"}
+
+async function publishAllSelected(){
   els.publishStatus.textContent="Publicando as fotos…";
   try{
-    for(let i=0;i<state.sources.length;i++){const out=await composeSource(state.sources[i].dataUrl);await postPhoto(out);els.publishStatus.textContent="Publicando "+(i+1)+" de "+state.sources.length+"…"}
-    els.publishStatus.textContent="Todas as lembranças foram adicionadas à galeria! 🌿";
-  }catch(e){els.publishStatus.textContent="Algumas fotos não puderam ser publicadas. Tente novamente."}
-  finally{if(btn){btn.disabled=false;btn.textContent="🌿 ADICIONAR TODAS À GALERIA"}}
+    for(let i=0;i<state.sources.length;i++){
+      const out=await composeSource(state.sources[i].dataUrl);
+      await postPhoto(out);
+      els.publishStatus.textContent="Publicando "+(i+1)+" de "+state.sources.length+"…";
+    }
+    els.publishStatus.textContent="Todas foram adicionadas à galeria! 🌿";
+    updateGalleryCount();
+  }catch(e){
+    els.publishStatus.textContent="Não foi possível publicar todas as fotos.";
+  }
 }
 
-function resetBooth(){
-  stopCamera();state.result=null;state.landmarks=null;state.studioTab="frames";state.frame=0;state.filter=0;state.sources=[];state.sourceIndex=0;
-  state.makeup={lipstick:null,lashes:"none",blush:null,intensity:.60};els.selectedStrip.classList.add("hidden");
-  els.publishStatus.textContent="";$("#publishBtn").textContent="🌿 ADICIONAR À GALERIA";els.switchCamera.classList.add("hidden");els.shutter.classList.add("hidden");els.nativeCamera.classList.add("hidden");
-  renderFrames();syncFrame();showScreen("welcome");
+/* GALERIA */
+async function updateGalleryCount(){
+  try{
+    const r=await fetch("/api/photos");
+    const j=await r.json();
+    els.galleryCount.textContent=j.photos?.length?"("+j.photos.length+")":"";
+  }catch{}
 }
-function navTo(which){
-  $$(".view").forEach(v=>v.classList.remove("active"));$("#"+which+"View").classList.add("active");
-  $$(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.go===which));
-  if(which==="gallery")loadGallery();else resetBooth();
-}
-$$("[data-go]").forEach(b=>b.onclick=()=>navTo(b.dataset.go));
-
-$("#startCamera").onclick=startCamera; $("#nativeCameraFallback").onclick=()=>{els.cameraInput.value="";els.cameraInput.click()};
-els.switchCamera.onclick=async()=>{state.facing=state.facing==="user"?"environment":"user";await startCamera()};
-els.shutter.onclick=()=>capture();
-els.nativeCamera.onclick=()=>{els.cameraInput.value="";els.cameraInput.click()};
-$("#chooseGallery").onclick=()=>{els.file.value="";els.file.click()};
-els.file.onchange=e=>chooseFiles(e.target.files||[]);
-els.cameraInput.onchange=e=>chooseFiles(e.target.files||[]);
-
-els.next.onclick=()=>capture();
-els.back.onclick=()=>resetBooth();
-
-$("#saveBtn").onclick=saveResult;$("#shareBtn").onclick=shareResult;$("#publishBtn").onclick=publishResult;$("#againBtn").onclick=resetBooth;
 
 async function galleryFile(p){
   const r=await fetch("/api/photos/"+p.id+"/image");
   if(!r.ok)throw new Error("Não foi possível carregar a foto");
   const blob=await r.blob();
-  const ext=blob.type.includes("png")?"png":blob.type.includes("webp")?"webp":"jpg";
-  return new File([blob],"safari-do-apolo."+ext,{type:blob.type||"image/jpeg"});
+  return new File([blob],"safari-do-apolo.jpg",{type:blob.type||"image/jpeg"});
 }
-function galleryShareUrl(p){return location.origin+"/share/photo/"+p.id}
+
 async function saveGalleryPhoto(p){
-  const file=await galleryFile(p),url=URL.createObjectURL(file),a=document.createElement("a");
-  a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
+  const file=await galleryFile(p);
+  const url=URL.createObjectURL(file);
+  const a=document.createElement("a");
+  a.href=url;a.download=file.name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1200);
 }
-async function nativeSharePhoto(p,hint=""){
+
+async function shareGalleryPhoto(p){
+  const file=await galleryFile(p);
+  if(navigator.share&&navigator.canShare?.({files:[file]})){
+    await navigator.share({
+      files:[file],
+      title:"Safari do Apolo",
+      text:"Uma lembrança da primeira volta ao sol do Apolo!"
+    });
+    return;
+  }
+  const shareUrl=location.origin+"/share/photo/"+p.id;
   try{
-    const file=await galleryFile(p);
-    if(navigator.share&&navigator.canShare?.({files:[file]})){
-      await navigator.share({files:[file],title:"Safari do Apolo",text:hint||"Uma lembrança da primeira volta ao sol do Apolo!"});
-      return true;
-    }
-  }catch(e){if(e?.name==="AbortError")return true}
-  return false;
-}
-async function shareStories(p){
-  const ok=await nativeSharePhoto(p,"Compartilhe esta lembrança no Instagram Stories 💚");
-  if(!ok){await saveGalleryPhoto(p);alert("A imagem foi salva. Abra o Instagram e escolha Stories para publicar.");}
-}
-async function shareWhatsApp(p){
-  const ok=await nativeSharePhoto(p,"Safari do Apolo 💚");
-  if(!ok){
-    const text=encodeURIComponent("Uma lembrança do Safari do Apolo 💚 "+galleryShareUrl(p));
-    window.open("https://wa.me/?text="+text,"_blank","noopener");
+    await navigator.clipboard.writeText(shareUrl);
+    alert("Link da foto copiado.");
+  }catch{
+    location.href=shareUrl;
   }
 }
-function shareFacebook(p){
-  const u=encodeURIComponent(galleryShareUrl(p));
-  window.open("https://www.facebook.com/sharer/sharer.php?u="+u,"_blank","noopener");
-}
-async function shareMore(p){
-  const ok=await nativeSharePhoto(p,"Uma lembrança da primeira volta ao sol do Apolo!");
-  if(!ok){
-    const u=galleryShareUrl(p);
-    try{
-      await navigator.clipboard.writeText(u);
-      alert("Seu navegador não abriu o menu de compartilhamento. O link da foto foi copiado.");
-    }catch{location.href=u}
-  }
-}
-async function toggleGalleryPhoto(p){
-  await fetch("/api/photos/"+p.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({hidden:!p.hidden})});
-  await loadGallery();
-}
-async function deleteGalleryPhoto(p){
-  if(!confirm("Excluir esta foto da galeria?"))return;
-  await fetch("/api/photos/"+p.id,{method:"DELETE"});
-  await loadGallery();
-}
+
 function galleryAction(label,cls,fn){
-  const b=document.createElement("button");b.type="button";b.className="gallery-action "+(cls||"");b.textContent=label;
-  b.onclick=async(e)=>{e.stopPropagation();b.disabled=true;try{await fn()}finally{b.disabled=false}};
+  const b=document.createElement("button");
+  b.type="button";b.className="gallery-action "+(cls||"");b.textContent=label;
+  b.onclick=async(e)=>{
+    e.stopPropagation();b.disabled=true;
+    try{await fn()}finally{b.disabled=false}
+  };
   return b;
 }
+
 async function loadGallery(){
-  const r=await fetch("/api/photos"),j=await r.json();
-  state.galleryAdmin=!!j.admin;els.galleryGrid.innerHTML="";els.galleryEmpty.classList.toggle("hidden",j.photos.length>0);
+  const r=await fetch("/api/photos");
+  const j=await r.json();
+  state.galleryAdmin=!!j.admin;
+  els.galleryGrid.innerHTML="";
+  els.galleryEmpty.classList.toggle("hidden",j.photos.length>0);
+  els.galleryCount.textContent=j.photos.length?"("+j.photos.length+")":"";
+
   for(const p of j.photos){
-    const card=document.createElement("article");card.className="gallery-item"+(p.hidden?" hidden-photo":"");
-    const photo=document.createElement("button");photo.type="button";photo.className="gallery-photo-button";
+    const card=document.createElement("article");
+    card.className="gallery-item"+(p.hidden?" hidden-photo":"");
+
+    const photo=document.createElement("button");
+    photo.type="button";
+    photo.className="gallery-photo-button";
     photo.innerHTML='<img loading="lazy" src="/api/photos/'+p.id+'/image" alt="Memória do Safari do Apolo">';
     photo.onclick=()=>openPhoto(p);
     card.appendChild(photo);
+
     if(state.galleryAdmin){
-      const badge=document.createElement("span");badge.className="gallery-admin-badge";badge.textContent=p.hidden?"Oculta":"Visível";card.appendChild(badge);
+      const badge=document.createElement("span");
+      badge.className="gallery-admin-badge";
+      badge.textContent=p.hidden?"Oculta":"Visível";
+      card.appendChild(badge);
     }
-    const actions=document.createElement("div");actions.className="gallery-actions gallery-actions-simple";
+
+    const actions=document.createElement("div");
+    actions.className="gallery-actions";
     actions.append(
-      galleryAction("⬇ Salvar","",()=>saveGalleryPhoto(p)),
-      galleryAction("↗ Compartilhar","share-main",()=>shareMore(p))
+      galleryAction("Salvar","",()=>saveGalleryPhoto(p)),
+      galleryAction("Compartilhar","share-main",()=>shareGalleryPhoto(p))
     );
     card.appendChild(actions);
+
     if(state.galleryAdmin){
-      const admin=document.createElement("div");admin.className="gallery-admin-actions";
+      const admin=document.createElement("div");
+      admin.className="gallery-admin-actions";
       admin.append(
-        galleryAction(p.hidden?"Mostrar":"Ocultar","admin-hide",()=>toggleGalleryPhoto(p)),
-        galleryAction("Excluir","admin-delete",()=>deleteGalleryPhoto(p))
+        galleryAction(p.hidden?"Mostrar":"Ocultar","",()=>togglePhoto(p)),
+        galleryAction("Excluir","",()=>deletePhoto(p))
       );
       card.appendChild(admin);
     }
@@ -571,43 +537,92 @@ async function loadGallery(){
   }
   $("#adminEntry").textContent=state.galleryAdmin?"Administração ativa":"Administrar galeria";
 }
+
+async function togglePhoto(p){
+  await fetch("/api/photos/"+p.id,{
+    method:"PATCH",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({hidden:!p.hidden})
+  });
+  await loadGallery();
+}
+async function deletePhoto(p){
+  if(!confirm("Excluir esta foto da galeria?"))return;
+  await fetch("/api/photos/"+p.id,{method:"DELETE"});
+  await loadGallery();
+}
+
 function openPhoto(p){
-  state.modalPhoto=p;$("#modalPhoto").src="/api/photos/"+p.id+"/image";$("#modalDownload").href="/api/photos/"+p.id+"/image";
-  $("#modalHide").classList.toggle("hidden",!state.galleryAdmin);$("#modalDelete").classList.toggle("hidden",!state.galleryAdmin);$("#modalHide").textContent=p.hidden?"Tornar visível":"Ocultar";$("#photoModal").classList.remove("hidden");
+  state.modalPhoto=p;
+  $("#modalPhoto").src="/api/photos/"+p.id+"/image";
+  $("#modalDownload").href="/api/photos/"+p.id+"/image";
+  $("#modalHide").classList.toggle("hidden",!state.galleryAdmin);
+  $("#modalDelete").classList.toggle("hidden",!state.galleryAdmin);
+  $("#modalHide").textContent=p.hidden?"Mostrar":"Ocultar";
+  $("#photoModal").classList.remove("hidden");
 }
 $("#closePhotoModal").onclick=()=>$("#photoModal").classList.add("hidden");
-$("#modalShare").onclick=async()=>shareMore(state.modalPhoto);
-$("#modalHide").onclick=async()=>{await toggleGalleryPhoto(state.modalPhoto);$("#photoModal").classList.add("hidden")};
-$("#modalDelete").onclick=async()=>{await deleteGalleryPhoto(state.modalPhoto);$("#photoModal").classList.add("hidden")};
+$("#modalShare").onclick=()=>state.modalPhoto&&shareGalleryPhoto(state.modalPhoto);
+$("#modalHide").onclick=async()=>{
+  if(!state.modalPhoto)return;
+  await togglePhoto(state.modalPhoto);
+  $("#photoModal").classList.add("hidden");
+};
+$("#modalDelete").onclick=async()=>{
+  if(!state.modalPhoto)return;
+  await deletePhoto(state.modalPhoto);
+  $("#photoModal").classList.add("hidden");
+};
 
+/* ADMIN */
 let adminSetupRequired=false;
-async function openAdminLogin(){
-  const s=await(await fetch("/api/session")).json();
+async function openAdmin(){
+  const s=await (await fetch("/api/session")).json();
   adminSetupRequired=!!s.setupRequired;
   $("#loginModal").classList.remove("hidden");
-  $("#logoutBtn").classList.toggle("hidden",!s.admin);
-  $("#loginBtn").classList.toggle("hidden",s.admin);
   $("#adminEmail").value=s.adminEmail||"";
   $("#adminEmail").readOnly=!!s.adminEmail;
+  $("#logoutBtn").classList.toggle("hidden",!s.admin);
+  $("#loginBtn").classList.toggle("hidden",s.admin);
   $("#loginBtn").textContent=adminSetupRequired?"Criar minha senha":"Entrar";
   $("#loginHint").textContent=s.admin
     ?"Você está logada como administradora."
     : adminSetupRequired
-      ?"Primeiro acesso: confirme seu e-mail e crie sua senha de administradora."
-      :"Entre com seu e-mail e sua senha de administradora.";
+      ?"Primeiro acesso: crie sua senha de administradora."
+      :"Entre com sua senha de administradora.";
   $("#loginStatus").textContent="";
 }
-$("#adminEntry").onclick=openAdminLogin;
-$("#topAdminBtn").onclick=openAdminLogin;
+$("#topAdminBtn").onclick=openAdmin;
+$("#adminEntry").onclick=openAdmin;
 $("#closeLogin").onclick=()=>$("#loginModal").classList.add("hidden");
 $("#loginBtn").onclick=async()=>{
   const endpoint=adminSetupRequired?"/api/setup-admin":"/api/login";
-  const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("#adminEmail").value,password:$("#adminPassword").value})});
-  const j=await r.json();if(!r.ok){$("#loginStatus").textContent=j.error;return}
-  $("#loginStatus").textContent=adminSetupRequired?"Acesso criado e login realizado.":"Login realizado.";
-  adminSetupRequired=false;$("#logoutBtn").classList.remove("hidden");$("#loginBtn").classList.add("hidden");loadGallery();
+  const r=await fetch(endpoint,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      email:$("#adminEmail").value,
+      password:$("#adminPassword").value
+    })
+  });
+  const j=await r.json();
+  if(!r.ok){
+    $("#loginStatus").textContent=j.error||"Não foi possível entrar.";
+    return;
+  }
+  adminSetupRequired=false;
+  $("#loginStatus").textContent="Login realizado.";
+  $("#loginBtn").classList.add("hidden");
+  $("#logoutBtn").classList.remove("hidden");
+  loadGallery();
 };
-$("#logoutBtn").onclick=async()=>{await fetch("/api/logout",{method:"POST"});$("#loginModal").classList.add("hidden");loadGallery()};
+$("#logoutBtn").onclick=async()=>{
+  await fetch("/api/logout",{method:"POST"});
+  $("#loginModal").classList.add("hidden");
+  loadGallery();
+};
 
-renderFrames();syncFrame();setStudioTab();
-window.addEventListener("resize",drawPreviewMakeup);
+renderFrames();
+syncFrame();
+showPlaceholder();
+updateGalleryCount();
