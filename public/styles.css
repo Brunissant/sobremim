@@ -68,3 +68,14 @@ body{background:radial-gradient(circle at 50% 14%,rgba(169,183,148,.16),transpar
 .camera-tools .small{flex:1;max-width:210px}
 .admin-help{margin:-5px 0 10px;color:var(--muted);font-size:.72rem;text-align:left}
 #adminEmail[readonly]{background:#f2ecdf;color:#5b6255}
+
+.top-actions{display:flex;align-items:center;gap:7px}
+.admin-top-btn{
+  border:1px solid var(--sage);background:var(--cream2);color:var(--forest);
+  min-height:34px;padding:7px 9px;border-radius:999px;font-size:.68rem;font-weight:800
+}
+.admin-top-btn:active{transform:scale(.98)}
+@media(max-width:420px){
+  .date-pill{display:none}
+  .admin-top-btn{font-size:.66rem}
+}
